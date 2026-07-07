@@ -1,0 +1,51 @@
+/* 全局样式 - 保持与Web端一致的视觉风格 */
+page {
+  background: #1a1a2e;
+  color: #e0e0e0;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* 按钮通用样式 */
+button {
+  border: none;
+  border-radius: 8px;
+  padding: 10px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+/* 输入框通用样式 */
+input {
+  padding: 12px 16px;
+  border: 2px solid #333;
+  border-radius: 8px;
+  background: #16213e;
+  color: #e0e0e0;
+  font-size: 16px;
+}
+
+/* 防止横屏时内容被刘海遮挡 */
+.safe-area-inset-top {
+  padding-top: constant(safe-area-inset-top);
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-inset-bottom {
+  padding-bottom: constant(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-area-inset-left {
+  padding-left: constant(safe-area-inset-left);
+  padding-left: env(safe-area-inset-left);
+}
+
+.safe-area-inset-right {
+  padding-right: constant(safe-area-inset-right);
+  padding-right: env(safe-area-inset-right);
+}

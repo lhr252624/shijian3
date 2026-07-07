@@ -1,0 +1,22 @@
+# Claude Code
+.claude/
+
+# Node modules
+node_modules/
+
+# Build outputs
+dist/
+unpackage/
+
+# IDE
+.vscode/
+.idea/
+.hbuilderx/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local

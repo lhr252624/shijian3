@@ -1,0 +1,28 @@
+{
+  "name": "liars-bar-mobile",
+  "version": "1.0.0",
+  "description": "骗子酒馆移动端",
+  "main": "main.js",
+  "scripts": {
+    "dev:h5": "uni",
+    "build:h5": "uni build",
+    "dev:mp-weixin": "uni -p mp-weixin",
+    "build:mp-weixin": "uni build -p mp-weixin",
+    "dev:app": "uni -p app",
+    "build:app": "uni build -p app"
+  },
+  "dependencies": {
+    "@dcloudio/uni-app": "3.0.0-alpha-4010520231227001",
+    "@dcloudio/uni-app-plus": "3.0.0-alpha-4010520231227001",
+    "@dcloudio/uni-h5": "3.0.0-alpha-4010520231227001",
+    "@dcloudio/uni-mp-weixin": "3.0.0-alpha-4010520231227001",
+    "pinia": "^2.1.7",
+    "vue": "^3.3.4"
+  },
+  "devDependencies": {
+    "@dcloudio/types": "^3.4.8",
+    "@dcloudio/uni-cli-shared": "3.0.0-alpha-4010520231227001",
+    "@dcloudio/vite-plugin-uni": "3.0.0-alpha-4010520231227001",
+    "vite": "^4.3.9"
+  }
+}

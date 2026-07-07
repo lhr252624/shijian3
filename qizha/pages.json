@@ -1,0 +1,62 @@
+{
+	"pages": [
+		{
+			"path": "pages/login/login",
+			"style": {
+				"navigationBarTitleText": "登录",
+				"navigationStyle": "custom",
+				"pageOrientation": "landscape"
+			}
+		},
+		{
+			"path": "pages/register/register",
+			"style": {
+				"navigationBarTitleText": "注册",
+				"navigationStyle": "custom",
+				"pageOrientation": "landscape"
+			}
+		},
+		{
+			"path": "pages/lobby/lobby",
+			"style": {
+				"navigationBarTitleText": "大厅",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/match-wait/match-wait",
+			"style": {
+				"navigationBarTitleText": "匹配中",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/game-room/game-room",
+			"style": {
+				"navigationBarTitleText": "游戏房间",
+				"navigationStyle": "custom",
+				"pageOrientation": "landscape"
+			}
+		},
+		{
+			"path": "pages/profile/profile",
+			"style": {
+				"navigationBarTitleText": "个人中心",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/history/history",
+			"style": {
+				"navigationBarTitleText": "历史战绩",
+				"navigationStyle": "custom"
+			}
+		}
+	],
+	"globalStyle": {
+		"navigationBarTextStyle": "white",
+		"navigationBarTitleText": "Liar's Bar",
+		"navigationBarBackgroundColor": "#1a1a2e",
+		"backgroundColor": "#1a1a2e"
+	}
+}
