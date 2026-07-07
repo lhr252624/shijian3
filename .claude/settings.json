@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git remote *)",
+      "Bash(git rm *)",
+      "Bash(rm -rf qizha/.git)",
+      "Bash(git reset *)",
+      "Bash(git branch *)",
+      "Bash(ssh -T git@github.com)"
+    ],
+    "additionalDirectories": [
+      "F:\\shijian3_frontend\\qizha\\.git"
+    ]
+  }
+}
