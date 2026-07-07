@@ -59,7 +59,7 @@
             <view class="waiting-avatar">{{ seat.player ? (seat.player.is_ai ? '🤖' : '👤') : '-' }}</view>
             <text class="waiting-name">{{ seat.player?.nickname || '等待加入' }}</text>
             <text class="waiting-status">
-              {{ seat.player ? (seat.player.is_ready ? '已准备' : '未准备') : '空位' }}
+              {{ seat.player ? (seat.player.is_ai ? 'AI' : (seat.player.is_ready ? '已准备' : '未准备')) : '空位' }}
             </text>
           </view>
         </view>
@@ -70,22 +70,51 @@
       </view>
     </view>
 
+    <!-- 连接中提示 -->
+    <view v-if="connecting" class="waiting-room">
+      <view class="wait-card">
+        <text class="wait-title">连接中...</text>
+      </view>
+    </view>
+
     <!-- 游戏区域 -->
     <view v-if="gameState && gameState.phase !== 'GAME_OVER'" class="game-area">
+      <!-- 行动日志面板 -->
+      <view class="action-log-panel">
+        <view class="log-header">
+          <text class="log-title">📋 行动日志</text>
+          <button class="log-clear-btn" @tap="clearActionLog">清空</button>
+        </view>
+        <scroll-view class="log-content" scroll-y="true" :scroll-top="logScrollTop">
+          <view v-for="(log, index) in actionLogs" :key="index" class="log-item" :class="log.type">
+            <text class="log-time">{{ log.time }}</text>
+            <text class="log-text">{{ log.message }}</text>
+          </view>
+          <view v-if="actionLogs.length === 0" class="log-empty">暂无行动记录</view>
+        </scroll-view>
+      </view>
+
       <!-- 对手区域 -->
       <view class="opponents-row">
         <view v-for="player in opponents" :key="player.id" class="player-card"
           :class="{ active: gameState.current_player === player.seat_index, eliminated: !player.is_alive }">
+          <!-- 玩家编号 -->
+          <view class="player-number">P{{ player.seat_index + 1 }}</view>
           <view class="player-avatar">
             <text v-if="player.is_ai">🤖</text>
             <text v-else>👤</text>
           </view>
           <text class="player-name">{{ player.nickname }}</text>
           <view class="player-hp">
-            <view v-for="i in 6" :key="i" class="hp-dot" :class="{ filled: i <= (player.punishment_count || 0) }">
+            <view v-for="i in 6" :key="i" class="hp-dot"
+              :class="{ filled: i <= (player.bullets || player.punishment_count || 0) }">
             </view>
           </view>
           <text class="card-count">{{ player.hand_count }} 张牌</text>
+          <!-- 显示最近出牌信息 -->
+          <text v-if="gameState.last_play && gameState.last_play.player_id === player.id" class="last-played">
+            刚出 {{ gameState.last_play.count }} 张 {{ gameState.last_play.claimed_card }}
+          </text>
           <view v-if="player.is_ai" class="ai-tag">AI</view>
           <view v-if="!player.is_alive" class="dead-tag">💀</view>
         </view>
@@ -93,6 +122,15 @@
 
       <!-- 中心区域 - 上家出牌 -->
       <view class="center-area">
+        <!-- 当前回合提示 -->
+        <view class="current-turn-banner">
+          <text v-if="gameState?.phase === 'CHALLENGE'" class="turn-text challenge-phase">
+            ⚠️ 质疑阶段 - 可以质疑或放弃
+          </text>
+          <text v-else-if="canPlayCard" class="turn-text my-turn">👉 轮到你操作</text>
+          <text v-else class="turn-text waiting">{{ currentPlayerName }} 操作中...</text>
+        </view>
+
         <view v-if="gameState.last_play" class="last-play">
           <text class="last-play-label">上家出牌</text>
           <view class="last-play-cards">
@@ -109,40 +147,85 @@
 
       <!-- 自己的手牌区域 -->
       <view class="my-area">
-        <view class="my-info">
-          <view class="my-avatar">👤</view>
-          <view class="my-details">
-            <text class="my-name">{{ authStore.user?.nickname || '我' }}</text>
-            <view class="my-hp">
-              <view v-for="i in 6" :key="i" class="hp-dot" :class="{ filled: i <= myPunishmentCount }"></view>
+        <view class="my-info-row">
+          <view class="my-info">
+            <!-- 玩家编号 -->
+            <view v-if="myPlayer" class="player-number my-number">P{{ myPlayer.seat_index + 1 }}</view>
+            <view class="my-avatar">👤</view>
+            <view class="my-details">
+              <text class="my-name">{{ authStore.user?.nickname || '我' }}</text>
+              <view class="my-hp">
+                <view v-for="i in 6" :key="i" class="hp-dot" :class="{ filled: i <= myPunishmentCount }"></view>
+              </view>
             </view>
           </view>
-        </view>
 
-        <!-- 手牌 -->
-        <view v-if="myHandCards.length > 0" class="hand-cards">
-          <view v-for="(card, idx) in myHandCards" :key="idx" class="hand-card"
-            :class="{ selected: selectedCards.includes(idx) }" @tap="toggleCard(idx)">
-            <text class="card-face">{{ card }}</text>
+          <!-- 手牌 -->
+          <view v-if="myHandCards.length > 0" class="hand-cards">
+            <view v-for="(card, idx) in myHandCards" :key="idx" class="hand-card"
+              :class="{ selected: selectedCards.includes(idx) }" @tap="toggleCard(idx)">
+              <text class="card-face">{{ card }}</text>
+            </view>
+          </view>
+          <view v-else class="no-cards">
+            <text>手牌已出完</text>
           </view>
         </view>
-        <view v-else class="no-cards">
-          <text>手牌已出完</text>
-        </view>
-
         <!-- 操作按钮 -->
         <view class="action-buttons">
-          <button v-if="isMyTurn" class="action-btn play-btn" :disabled="selectedCards.length === 0" @tap="playCards">
+          <!-- 手牌为0的提示 -->
+          <view v-if="myPlayer && myPlayer.hand_count === 0 && gameState?.phase === 'PLAYING'" class="waiting-turn">
+            <text>手牌已空，自动跳过</text>
+          </view>
+
+          <!-- CHALLENGE 阶段提示 -->
+          <view v-else-if="gameState?.phase === 'CHALLENGE' && !hasAnyAction" class="waiting-turn challenge-phase-hint">
+            <text>质疑阶段 - 等待其他玩家决定...</text>
+          </view>
+
+          <!-- 出牌按钮 - 仅当legal_actions包含PLAY_CARD -->
+          <button
+            v-if="canPlayCard"
+            class="action-btn play-btn"
+            :disabled="selectedCards.length === 0"
+            @tap="playCards"
+          >
             出牌 ({{ selectedCards.length }})
           </button>
-          <button v-if="canChallenge" class="action-btn challenge-btn" @tap="challenge">
-            质疑上家
+
+          <!-- 质疑按钮 - 仅当legal_actions包含CHALLENGE -->
+          <button
+            v-if="canChallenge"
+            class="action-btn challenge-btn"
+            @tap="challenge"
+          >
+            质疑
           </button>
-          <button v-if="isMyTurn" class="action-btn pass-btn" @tap="passTurn">
-            过
+
+          <!-- 放弃按钮 - 仅当legal_actions包含PASS -->
+          <button
+            v-if="canPass"
+            class="action-btn pass-btn"
+            @tap="passTurn"
+          >
+            {{ gameState?.phase === 'CHALLENGE' ? '放弃质疑' : '跳过' }}
           </button>
-          <view v-if="!isMyTurn" class="waiting-turn">
-            <text>等待其他玩家操作...</text>
+
+          <!-- Foxy主动技能按钮 - 独立于legal_actions -->
+          <button
+            v-if="canUseSkill"
+            class="action-btn skill-btn"
+            :disabled="skillUsed"
+            @tap="showSkillTargetSelect"
+          >
+            {{ skillUsed ? '技能已使用' : '🔍 偷看手牌' }}
+          </button>
+
+          <!-- 等待提示 - 没有任何可用操作时显示 -->
+          <view v-if="!hasAnyAction && myPlayer && myPlayer.hand_count > 0" class="waiting-turn">
+            <text v-if="gameState?.phase === 'CHALLENGE'">等待其他玩家质疑...</text>
+            <text v-else-if="gameState?.phase === 'PLAYING'">等待其他玩家操作...</text>
+            <text v-else>等待游戏继续...</text>
           </view>
         </view>
       </view>
@@ -151,24 +234,80 @@
     <!-- 规则弹窗 -->
     <RulesModal v-model:visible="showRules" />
 
+    <!-- Foxy技能目标选择弹窗 -->
+    <view v-if="showSkillTargets" class="skill-overlay" @tap.self="showSkillTargets = false">
+      <view class="skill-modal">
+        <text class="skill-modal-title">选择偷看目标</text>
+        <view class="skill-targets">
+          <view
+            v-for="player in opponents"
+            :key="player.id"
+            class="skill-target"
+            :class="{ disabled: !player.is_alive }"
+            @tap="useSkillOnTarget(player.id)"
+          >
+            <view class="target-avatar">{{ player.is_ai ? '🤖' : '👤' }}</view>
+            <text class="target-name">{{ player.nickname }}</text>
+            <text class="target-cards">{{ player.hand_count }} 张牌</text>
+          </view>
+        </view>
+        <button class="skill-cancel" @tap="showSkillTargets = false">取消</button>
+      </view>
+    </view>
+
+    <!-- Foxy技能偷看结果弹窗 -->
+    <view v-if="skillPeekResult" class="skill-peek-overlay">
+      <view class="skill-peek-modal">
+        <text class="peek-title">🔍 {{ skillPeekResult.targetName }} 的手牌</text>
+        <view class="peek-cards">
+          <view v-for="(card, idx) in skillPeekResult.cards" :key="idx" class="peek-card">
+            <text class="peek-card-face">{{ card }}</text>
+          </view>
+        </view>
+        <text class="peek-timer">{{ skillPeekResult.remaining }}秒后自动关闭</text>
+      </view>
+    </view>
+
     <!-- Toast -->
     <Toast v-model:visible="toast.show" :message="toast.msg" :type="toast.type" />
+
+    <!-- 自定义确认对话框 -->
+    <ConfirmDialog
+      v-model:visible="confirmDialog.visible"
+      :title="confirmDialog.title"
+      :content="confirmDialog.content"
+      @confirm="confirmDialog.onConfirm"
+      @cancel="confirmDialog.onCancel"
+    />
+
+    <!-- 自定义输入对话框 -->
+    <InputDialog
+      v-model:visible="inputDialog.visible"
+      :title="inputDialog.title"
+      :placeholder="inputDialog.placeholder"
+      @confirm="inputDialog.onConfirm"
+      @cancel="inputDialog.onCancel"
+    />
   </view>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, onActivated, nextTick } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import { useAuthStore } from '../../stores/auth'
 import { useGameStore } from '../../stores/game'
 import { roomAPI } from '../../utils/api'
 import wsClient from '../../utils/websocket'
 import Toast from '../../components/Toast.vue'
 import RulesModal from '../../components/RulesModal.vue'
+import ConfirmDialog from '../../components/ConfirmDialog.vue'
+import InputDialog from '../../components/InputDialog.vue'
 
 const authStore = useAuthStore()
 const gameStore = useGameStore()
 
 const roomId = ref('')
+const pageOptions = ref(null)
 const gameState = ref(null)
 const roomState = ref(null)
 const showRules = ref(false)
@@ -183,9 +322,36 @@ const connecting = ref(true)
 const chatMessages = ref([])
 const chatText = ref('')
 
+// Foxy技能相关
+const skillUsed = ref(false)
+const showSkillTargets = ref(false)
+const skillPeekResult = ref(null)
+
+// 行动日志
+const actionLogs = ref([])
+const logScrollTop = ref(0)
+
+// 自定义对话框
+const confirmDialog = ref({
+  visible: false,
+  title: '提示',
+  content: '',
+  onConfirm: () => {},
+  onCancel: () => {}
+})
+
+const inputDialog = ref({
+  visible: false,
+  title: '请输入',
+  placeholder: '',
+  onConfirm: (value) => {},
+  onCancel: () => {}
+})
+
 let challengeFxTimer = null
 let eliminateFxTimer = null
 let shakeTimer = null
+let statePollingTimer = null
 
 // 强制横屏
 function setLandscape() {
@@ -196,7 +362,11 @@ function setLandscape() {
 }
 
 // 计算属性
-const myPlayerId = computed(() => authStore.user?.id)
+const myPlayerId = computed(() => {
+  const userId = authStore.user?.id
+  console.log('myPlayerId:', userId, 'authStore.user:', authStore.user)
+  return userId
+})
 
 const myPlayer = computed(() => {
   if (!gameState.value?.players) return null
@@ -209,11 +379,17 @@ const opponents = computed(() => {
 })
 
 const myHandCards = computed(() => {
+  // 从gameState中获取自己的手牌（GAME_STATE消息中的hand字段）
+  if (gameState.value?.hand) {
+    return gameState.value.hand
+  }
+  // 兼容旧格式
   return myPlayer.value?.hand || []
 })
 
 const myPunishmentCount = computed(() => {
-  return myPlayer.value?.punishment_count || 0
+  // 使用bullets字段
+  return myPlayer.value?.bullets || myPlayer.value?.punishment_count || 0
 })
 
 const isMyTurn = computed(() => {
@@ -222,9 +398,38 @@ const isMyTurn = computed(() => {
     gameState.value.phase === 'PLAYING'
 })
 
+// 根据legal_actions判断能否执行各种操作
+const legalActions = computed(() => {
+  return gameState.value?.legal_actions || []
+})
+
+const canPlayCard = computed(() => {
+  return legalActions.value.includes('PLAY_CARD')
+})
+
 const canChallenge = computed(() => {
-  if (!isMyTurn.value || !gameState.value?.last_play) return false
-  return gameState.value.last_play.player_id !== myPlayerId.value
+  return legalActions.value.includes('CHALLENGE')
+})
+
+const canPass = computed(() => {
+  return legalActions.value.includes('PASS')
+})
+
+// Foxy技能相关
+const myCharacter = computed(() => {
+  return myPlayer.value?.character_id || ''
+})
+
+const canUseSkill = computed(() => {
+  // 只有Foxy有主动技能
+  if (myCharacter.value !== 'foxy') return false
+  // 游戏进行中且还没使用过
+  if (gameState.value?.phase !== 'PLAYING' && gameState.value?.phase !== 'CHALLENGE') return false
+  return true
+})
+
+const hasAnyAction = computed(() => {
+  return canPlayCard.value || canChallenge.value || canPass.value || canUseSkill.value
 })
 
 const lastPlayPlayerName = computed(() => {
@@ -234,6 +439,13 @@ const lastPlayPlayerName = computed(() => {
   return player?.nickname || '玩家'
 })
 
+const currentPlayerName = computed(() => {
+  if (!gameState.value) return ''
+  const player = gameState.value.players?.find(p => p.seat_index === gameState.value.current_player)
+  if (!player) return '未知玩家'
+  return player.is_ai ? `${player.nickname} (AI)` : player.nickname
+})
+
 const winnerName = computed(() => {
   if (!gameState.value?.winner_id) return ''
   const winner = gameState.value.players?.find(p => p.id === gameState.value.winner_id)
@@ -241,12 +453,30 @@ const winnerName = computed(() => {
 })
 
 // 等待房间相关
-const roomPlayers = computed(() => roomState.value?.players || [])
-const myRoomPlayer = computed(() => roomPlayers.value.find(p => p.id === myPlayerId.value))
+const roomPlayers = computed(() => {
+  const players = roomState.value?.players || []
+  console.log('计算roomPlayers:', players)
+  return players
+})
+
+const myRoomPlayer = computed(() => {
+  const player = roomPlayers.value.find(p => p.id === myPlayerId.value || p.user_id === myPlayerId.value)
+  console.log('计算myRoomPlayer:', player, 'myPlayerId:', myPlayerId.value)
+  return player
+})
 const waitingSeats = computed(() => {
   const maxPlayers = roomState.value?.max_players || 4
   const seats = []
-  const playersBySeat = new Map(roomPlayers.value.map(p => [p.seat_index, p]))
+  const playersBySeat = new Map()
+
+  // 根据seat_index建立映射
+  roomPlayers.value.forEach(p => {
+    if (p.seat_index !== undefined) {
+      playersBySeat.set(p.seat_index, p)
+    }
+  })
+
+  console.log('waitingSeats - maxPlayers:', maxPlayers, 'playersBySeat:', playersBySeat)
 
   for (let i = 0; i < maxPlayers; i++) {
     seats.push({
@@ -257,44 +487,129 @@ const waitingSeats = computed(() => {
   return seats
 })
 
-onMounted(() => {
-  setLandscape()
+// onLoad 钩子接收页面参数
+onLoad((options) => {
+  console.log('=== game-room onLoad 接收参数 ===')
+  console.log('页面参数 options:', options)
 
-  // 检查登录状态
-  if (!authStore.isLoggedIn || !authStore.user) {
-    uni.reLaunch({
-      url: '/pages/login/login'
-    })
-    return
-  }
+  pageOptions.value = options
+  roomId.value = options?.id || ''
 
-  // 获取房间ID
-  const pages = getCurrentPages()
-  const currentPage = pages[pages.length - 1]
-  roomId.value = currentPage.options.id || ''
+  console.log('房间ID:', roomId.value)
 
   if (!roomId.value) {
+    console.error('房间ID无效，参数:', options)
     showToast('房间ID无效')
     setTimeout(() => uni.navigateBack(), 1500)
-    return
   }
+})
 
-  // 连接 WebSocket
-  wsClient.connect()
+onMounted(async () => {
+  console.log('=== game-room onMounted 开始 ===')
 
-  // 监听游戏事件
-  wsClient.on('GAME_STATE', onGameState)
-  wsClient.on('GAME_STARTED', onGameStarted)
-  wsClient.on('CHALLENGE_RESULT', onChallengeResult)
-  wsClient.on('RUSSIAN_ROULETTE', onRoulette)
-  wsClient.on('PLAYER_ELIMINATED', onPlayerEliminated)
-  wsClient.on('GAME_OVER', onGameOver)
-  wsClient.on('PLAYER_LEFT', onPlayerLeft)
-  wsClient.on('PLAYER_JOINED', onPlayerJoined)
-  wsClient.on('CHAT', onChat)
+  try {
+    setLandscape()
 
-  // 初始化房间数据
-  loadRoomData()
+    // 详细检查 authStore 状态
+    console.log('authStore.isLoggedIn:', authStore.isLoggedIn)
+    console.log('authStore.token:', authStore.token ? '已设置' : '未设置')
+    console.log('authStore.user:', authStore.user)
+
+    // 检查本地存储
+    const storedToken = uni.getStorageSync('token')
+    const storedUser = uni.getStorageSync('user')
+    console.log('localStorage token:', storedToken ? '已存储' : '未存储')
+    console.log('localStorage user:', storedUser)
+
+    // 检查登录状态
+    if (!authStore.isLoggedIn) {
+      console.error('未登录，跳转到登录页')
+      uni.reLaunch({
+        url: '/pages/login/login'
+      })
+      return
+    }
+
+    // 确保user已加载
+    if (!authStore.user || !authStore.user.id) {
+      console.error('用户信息未加载，user:', authStore.user)
+
+      // 尝试从本地存储恢复
+      if (storedUser) {
+        try {
+          const parsedUser = typeof storedUser === 'string' ? JSON.parse(storedUser) : storedUser
+          console.log('尝试从本地存储恢复用户:', parsedUser)
+          if (parsedUser && parsedUser.id) {
+            authStore.updateUser(parsedUser)
+            console.log('用户信息已恢复:', authStore.user)
+          }
+        } catch (e) {
+          console.error('恢复用户信息失败:', e)
+        }
+      }
+
+      // 再次检查
+      if (!authStore.user || !authStore.user.id) {
+        showToast('用户信息错误，请重新登录')
+        setTimeout(() => {
+          uni.reLaunch({
+            url: '/pages/login/login'
+          })
+        }, 1500)
+        return
+      }
+    }
+
+    console.log('当前用户ID:', authStore.user.id)
+    console.log('当前用户昵称:', authStore.user.nickname)
+
+    // 再次检查房间ID（onLoad中已设置）
+    if (!roomId.value) {
+      console.error('房间ID无效')
+      showToast('房间ID无效')
+      setTimeout(() => uni.navigateBack(), 1500)
+      return
+    }
+
+    // 连接 WebSocket
+    console.log('开始连接 WebSocket')
+    wsClient.connect()
+
+    // 等待WebSocket连接后，发送加入房间消息
+    setTimeout(() => {
+      console.log('发送 PLAYER_JOIN 消息，roomId:', roomId.value)
+      wsClient.send('PLAYER_JOIN', {})
+    }, 500)
+
+    console.log('注册 WebSocket 事件监听器')
+    // 监听游戏事件
+    wsClient.on('ROOM_STATE', onRoomState)
+    wsClient.on('GAME_STATE', onGameState)
+    wsClient.on('GAME_STARTED', onGameStarted)
+    wsClient.on('CHALLENGE_RESULT', onChallengeResult)
+    wsClient.on('RUSSIAN_ROULETTE', onRoulette)
+    wsClient.on('PLAYER_ELIMINATED', onPlayerEliminated)
+    wsClient.on('GAME_OVER', onGameOver)
+    wsClient.on('PLAYER_LEFT', onPlayerLeft)
+    wsClient.on('PLAYER_JOINED', onPlayerJoined)
+    wsClient.on('CHAT', onChat)
+    wsClient.on('SKILL_RESULT', onSkillResult)
+
+    console.log('开始加载房间数据')
+    // 初始化房间数据
+    await loadRoomData()
+
+    // 启动状态轮询，防止游戏卡住
+    startStatePolling()
+
+    console.log('=== game-room onMounted 结束 ===')
+  } catch (error) {
+    console.error('=== onMounted 发生错误 ===')
+    console.error('错误对象:', error)
+    console.error('错误消息:', error.message)
+    console.error('错误堆栈:', error.stack)
+    showToast('页面加载失败: ' + error.message)
+  }
 })
 
 onActivated(() => {
@@ -306,8 +621,10 @@ onUnmounted(() => {
   if (challengeFxTimer) clearTimeout(challengeFxTimer)
   if (eliminateFxTimer) clearTimeout(eliminateFxTimer)
   if (shakeTimer) clearTimeout(shakeTimer)
+  if (statePollingTimer) clearInterval(statePollingTimer)
 
   // 移除事件监听
+  wsClient.off('ROOM_STATE', onRoomState)
   wsClient.off('GAME_STATE', onGameState)
   wsClient.off('GAME_STARTED', onGameStarted)
   wsClient.off('CHALLENGE_RESULT', onChallengeResult)
@@ -317,28 +634,98 @@ onUnmounted(() => {
   wsClient.off('PLAYER_LEFT', onPlayerLeft)
   wsClient.off('PLAYER_JOINED', onPlayerJoined)
   wsClient.off('CHAT', onChat)
+  wsClient.off('SKILL_RESULT', onSkillResult)
 })
 
 async function loadRoomData() {
   try {
     const res = await roomAPI.get(roomId.value)
-    if (res.data) {
-      if (res.data.game_state) {
-        gameState.value = res.data.game_state
-        gameStore.updateState(res.data.game_state)
+    console.log('房间详情响应:', res)
+
+    if (res.code === 0 && res.data) {
+      // 新API返回格式: { room: {...}, players: [...] }
+      if (res.data.room) {
+        roomState.value = {
+          id: res.data.room.id,
+          name: res.data.room.room_name,
+          status: res.data.room.status,
+          max_players: res.data.room.max_players || 4,
+          player_count: res.data.room.current_players || 0,
+          players: res.data.players || [],
+          ready_count: (res.data.players || []).filter(p => p.is_ready).length
+        }
+        console.log('房间状态已设置:', roomState.value)
+
+        // 如果房间状态不是PLAYING，则显示等待界面
+        if (res.data.room?.status !== 'PLAYING') {
+          connecting.value = false
+          console.log('房间状态为WAITING，显示等待界面')
+        }
       }
-      roomState.value = res.data
+
+      // 如果房间状态是PLAYING，请求游戏状态
+      if (res.data.room?.status === 'PLAYING') {
+        console.log('房间正在游戏中，等待GAME_STATE推送')
+        // 通过WebSocket发送RECONNECT消息获取游戏状态
+        wsClient.send('RECONNECT', {})
+      }
+    } else {
+      // 如果请求失败，也要取消connecting状态
+      connecting.value = false
     }
-    connecting.value = false
   } catch (e) {
     console.error('Load room error:', e)
-    showToast('加载房间失败')
+    showToast('加载房间失败: ' + (e.msg || e.message || '未知错误'))
     connecting.value = false
   }
 }
 
+// 状态轮询：定期请求游戏状态，防止卡住
+function startStatePolling() {
+  // 每5秒轮询一次游戏状态
+  statePollingTimer = setInterval(() => {
+    if (gameState.value && gameState.value.phase === 'PLAYING') {
+      console.log('轮询游戏状态...')
+      wsClient.send('RECONNECT', {})
+    }
+  }, 5000)
+}
+
 function showToast(msg, type = 'error') {
   toast.value = { show: true, msg, type }
+}
+
+// 行动日志工具函数
+function addActionLog(message, type = 'info') {
+  const now = new Date()
+  const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`
+
+  actionLogs.value.push({
+    time,
+    message,
+    type // 'info', 'play', 'challenge', 'punishment', 'eliminate', 'system'
+  })
+
+  // 限制日志数量，最多保留100条
+  if (actionLogs.value.length > 100) {
+    actionLogs.value.shift()
+  }
+
+  // 自动滚动到底部
+  nextTick(() => {
+    logScrollTop.value = 999999
+  })
+}
+
+function clearActionLog() {
+  actionLogs.value = []
+}
+
+// 获取玩家名称（带编号）
+function getPlayerName(playerId) {
+  const player = gameState.value?.players?.find(p => p.id === playerId)
+  if (!player) return '未知玩家'
+  return `P${player.seat_index + 1}-${player.nickname}${player.is_ai ? '(AI)' : ''}`
 }
 
 // 特效触发函数
@@ -368,7 +755,8 @@ function triggerEliminateFx(playerId) {
 
 // 卡牌操作
 function toggleCard(index) {
-  if (!isMyTurn.value) return
+  // 只有能出牌时才能选牌
+  if (!canPlayCard.value) return
 
   const idx = selectedCards.value.indexOf(index)
   if (idx > -1) {
@@ -396,6 +784,10 @@ function playCards() {
     claim: gameState.value.target_card
   })
 
+  // 记录自己的出牌行动
+  const myName = myPlayer.value ? `P${myPlayer.value.seat_index + 1}-${authStore.user?.nickname || '我'}` : '我'
+  addActionLog(`${myName} 出了 ${selectedCards.value.length} 张 ${gameState.value.target_card}`, 'play')
+
   resetSelection()
 }
 
@@ -406,11 +798,75 @@ function challenge() {
   wsClient.send('CHALLENGE', {
     target_player_id: targetId
   })
+
+  // 记录质疑行动
+  const myName = myPlayer.value ? `P${myPlayer.value.seat_index + 1}-${authStore.user?.nickname || '我'}` : '我'
+  const targetName = getPlayerName(targetId)
+  addActionLog(`${myName} 选择质疑 ${targetName}`, 'challenge')
 }
 
 function passTurn() {
   wsClient.send('PASS')
+
+  // 记录放弃质疑
+  const myName = myPlayer.value ? `P${myPlayer.value.seat_index + 1}-${authStore.user?.nickname || '我'}` : '我'
+  addActionLog(`${myName} 选择不质疑，轮到下家`, 'info')
+
   resetSelection()
+}
+
+// Foxy技能相关函数
+function showSkillTargetSelect() {
+  if (skillUsed.value) {
+    showToast('技能已使用', 'info')
+    return
+  }
+  showSkillTargets.value = true
+}
+
+function useSkillOnTarget(targetPlayerId) {
+  const target = gameState.value?.players?.find(p => p.id === targetPlayerId)
+  if (!target || !target.is_alive) {
+    showToast('无效的目标', 'error')
+    return
+  }
+
+  // 发送技能使用请求
+  wsClient.send('USE_SKILL', {
+    target_player_id: targetPlayerId
+  })
+
+  showSkillTargets.value = false
+  skillUsed.value = true
+  console.log('使用Foxy技能，目标:', targetPlayerId)
+}
+
+function onSkillResult(payload) {
+  console.log('收到技能结果:', payload)
+  if (payload.skill === 'foxy_peek') {
+    const target = gameState.value?.players?.find(p => p.id === payload.target_player_id)
+    const targetName = target?.nickname || '玩家'
+    const duration = Math.floor((payload.duration_ms || 3000) / 1000)
+
+    skillPeekResult.value = {
+      targetName,
+      cards: payload.hand || [],
+      remaining: duration
+    }
+
+    // 倒计时
+    let remaining = duration
+    const timer = setInterval(() => {
+      remaining--
+      if (skillPeekResult.value) {
+        skillPeekResult.value.remaining = remaining
+      }
+      if (remaining <= 0) {
+        clearInterval(timer)
+        skillPeekResult.value = null
+      }
+    }, 1000)
+  }
 }
 
 function setReady() {
@@ -436,44 +892,137 @@ function addSystemMsg(content) {
 }
 
 function leaveRoom() {
-  uni.showModal({
+  confirmDialog.value = {
+    visible: true,
     title: '提示',
     content: '确定要离开房间吗？',
-    success: async (res) => {
-      if (res.confirm) {
-        try {
-          await roomAPI.leave(roomId.value)
-        } catch (e) {
-          console.error('Leave room error:', e)
-        }
-        uni.navigateBack()
+    onConfirm: async () => {
+      try {
+        await roomAPI.leave(roomId.value)
+      } catch (e) {
+        console.error('Leave room error:', e)
       }
+      uni.navigateBack()
+    },
+    onCancel: () => {
+      confirmDialog.value.visible = false
     }
-  })
+  }
 }
 
 // WebSocket 事件处理
+function onRoomState(payload) {
+  console.log('ROOM_STATE:', payload)
+  // 更新房间状态（等待阶段）
+  roomState.value = {
+    id: payload.id,
+    name: payload.name,
+    status: payload.phase || 'WAITING',
+    max_players: payload.max_players || 4,
+    player_count: payload.player_count || 0,
+    players: payload.players || [],
+    ready_count: payload.ready_count || 0
+  }
+  connecting.value = false
+  console.log('房间状态已更新，connecting设为false，roomState:', roomState.value)
+}
+
 function onGameState(payload) {
-  console.log('GAME_STATE:', payload)
-  gameState.value = payload
-  gameStore.updateState(payload)
+  console.log('========== GAME_STATE 接收 ==========')
+  console.log('完整payload:', JSON.stringify(payload, null, 2))
+  console.log('当前玩家座位:', payload.current_player)
+  console.log('当前回合:', payload.turn)
+  console.log('当前轮次:', payload.round)
+  console.log('阶段:', payload.phase)
+
+  // 更新游戏状态
+  gameState.value = {
+    phase: payload.phase,
+    current_player: payload.current_player,
+    current_turn: payload.turn || 0,
+    current_round: payload.round || 1,
+    target_card: payload.target_card,
+    alive_count: payload.players?.filter(p => p.is_alive).length || 0,
+    players: payload.players || [],
+    legal_actions: payload.legal_actions || [],
+    last_play: payload.last_play ? {
+      player_id: payload.last_play.player_id,
+      count: payload.last_play.card_count,
+      claimed_card: payload.last_play.claim
+    } : null
+  }
+
+  // 记录上家出牌日志
+  if (payload.last_play) {
+    const playerName = getPlayerName(payload.last_play.player_id)
+    addActionLog(`${playerName} 出了 ${payload.last_play.card_count} 张 ${payload.last_play.claim}`, 'play')
+  }
+
+  // 找到当前操作的玩家
+  const currentPlayer = payload.players?.find(p => p.seat_index === payload.current_player)
+  if (currentPlayer) {
+    console.log('当前操作玩家:', {
+      id: currentPlayer.id,
+      nickname: currentPlayer.nickname,
+      is_ai: currentPlayer.is_ai,
+      seat_index: currentPlayer.seat_index,
+      is_alive: currentPlayer.is_alive,
+      hand_count: currentPlayer.hand_count
+    })
+
+    // 记录回合开始日志
+    if (payload.phase === 'PLAYING') {
+      const playerName = getPlayerName(currentPlayer.id)
+      addActionLog(`轮到 ${playerName} 行动 (回合${payload.turn})`, 'info')
+    } else if (payload.phase === 'CHALLENGE') {
+      addActionLog(`进入质疑阶段，可以质疑或放弃`, 'challenge')
+    }
+
+    // 检测可能的卡住情况
+    if (currentPlayer.hand_count === 0 && currentPlayer.is_alive) {
+      console.warn('⚠️ 游戏可能卡住：当前玩家手牌为0但仍是操作者')
+      console.warn('玩家信息:', currentPlayer.nickname, 'seat:', currentPlayer.seat_index)
+    }
+  } else {
+    console.warn('找不到当前操作玩家，seat_index:', payload.current_player)
+  }
+
+  console.log('=====================================')
+
+  gameStore.updateState(gameState.value)
   connecting.value = false
 }
 
 function onGameStarted(payload) {
   console.log('GAME_STARTED:', payload)
+  // 游戏开始时设置初始游戏状态
+  if (payload.phase) {
+    gameState.value = {
+      phase: payload.phase,
+      current_player: payload.current_player,
+      current_turn: 0,
+      current_round: payload.round || 1,
+      target_card: payload.target_card,
+      alive_count: payload.players?.filter(p => p.is_alive).length || 0,
+      players: payload.players || [],
+      last_play: null
+    }
+  }
   addSystemMsg('游戏开始！')
   showToast('游戏开始！', 'success')
+  addActionLog(`🎮 游戏开始！第 ${payload.round || 1} 轮，目标牌：${payload.target_card}`, 'system')
 }
 
 function onChallengeResult(payload) {
   console.log('CHALLENGE_RESULT:', payload)
 
   const success = payload.success
-  const truthful = payload.truthful
   const challengerId = payload.challenger_id
-  const liarId = payload.liar_id
+  const targetId = payload.target_id
   const loserId = payload.loser_id
+
+  const challengerName = getPlayerName(challengerId)
+  const targetName = getPlayerName(targetId)
 
   triggerChallengeFx(success)
 
@@ -483,9 +1032,12 @@ function onChallengeResult(payload) {
   // #endif
 
   if (success) {
-    addSystemMsg(`质疑成功！玩家${liarId}在撒谎，实际牌为：${payload.challenged_cards?.join(', ')}`)
+    addSystemMsg(`质疑成功！玩家说谎，实际牌为：${payload.actual_cards?.join(', ')}`)
+    addActionLog(`${challengerName} 质疑 ${targetName}：质疑成功！对方在说谎`, 'challenge')
+    addActionLog(`实际牌为：${payload.actual_cards?.join(', ')}`, 'challenge')
   } else {
     addSystemMsg(`质疑失败！对方说的是真话`)
+    addActionLog(`${challengerName} 质疑 ${targetName}：质疑失败！对方说真话`, 'challenge')
   }
 }
 
@@ -495,10 +1047,14 @@ function onRoulette(payload) {
   const survived = payload.survived
   const bulletCount = payload.bullet_count
 
+  const playerName = getPlayerName(playerId)
+
   if (survived) {
     addSystemMsg(`玩家${playerId}扣动扳机${bulletCount}次，幸存！`)
+    addActionLog(`🎲 ${playerName} 进入惩罚阶段，扣动扳机 ${bulletCount} 次 → 幸存`, 'punishment')
   } else {
     addSystemMsg(`玩家${playerId}扣动扳机${bulletCount}次，被击中！`)
+    addActionLog(`💥 ${playerName} 进入惩罚阶段，扣动扳机 ${bulletCount} 次 → 被击中！`, 'punishment')
   }
 }
 
@@ -512,7 +1068,18 @@ function onPlayerEliminated(payload) {
   uni.vibrateLong()
   // #endif
 
-  addSystemMsg(`玩家已被淘汰`)
+  const playerName = getPlayerName(playerId)
+  addSystemMsg(`${playerName} 被淘汰`)
+  addActionLog(`💀 ${playerName} 被淘汰出局`, 'eliminate')
+
+  // 更新玩家存活状态
+  if (gameState.value?.players) {
+    const player = gameState.value.players.find(p => p.id === playerId)
+    if (player) {
+      player.is_alive = false
+    }
+    gameState.value.alive_count = gameState.value.players.filter(p => p.is_alive).length
+  }
 }
 
 function onGameOver(payload) {
@@ -522,7 +1089,10 @@ function onGameOver(payload) {
     phase: 'GAME_OVER',
     winner_id: payload.winner_id
   }
-  addSystemMsg(`游戏结束！`)
+
+  const winnerName = getPlayerName(payload.winner_id)
+  addSystemMsg(`游戏结束！${winnerName} 获胜`)
+  addActionLog(`🏆 游戏结束！${winnerName} 获得胜利`, 'system')
 }
 
 function onPlayerLeft(payload) {
@@ -539,14 +1109,19 @@ function onPlayerLeft(payload) {
       winner_id: payload.winner_id
     }
     addSystemMsg(leaveDetail.value)
+    addActionLog(`🚪 ${name} 退出游戏，本局结束`, 'system')
   } else {
-    addSystemMsg(`玩家 ${payload.nickname || payload.player_id} 离开了房间`)
+    const name = payload.nickname || `玩家${payload.player_id}`
+    addSystemMsg(`${name} 离开了房间`)
+    addActionLog(`🚪 ${name} 离开了房间`, 'system')
   }
 }
 
 function onPlayerJoined(payload) {
   console.log('PLAYER_JOINED:', payload)
-  addSystemMsg(`玩家 ${payload.nickname || payload.player_id} 加入了房间`)
+  const name = payload.nickname || `玩家${payload.player_id}`
+  addSystemMsg(`${name} 加入了房间`)
+  addActionLog(`👋 ${name} 加入了房间`, 'system')
 }
 
 function onChat(payload) {
@@ -572,6 +1147,157 @@ function onChat(payload) {
   height: 100vh;
   overflow: hidden;
   background: #0a0604;
+}
+
+/* 行动日志面板 */
+.action-log-panel {
+  position: fixed;
+  top: 70px;
+  right: 20px;
+  width: 320px;
+  height: 400px;
+  background: linear-gradient(160deg, rgba(26, 15, 10, 0.95) 0%, rgba(42, 24, 18, 0.95) 100%);
+  border: 2px solid #5a3a1e;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.log-header {
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #3a2616 0%, #2a1812 100%);
+  border-bottom: 1px solid #5a3a1e;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.log-title {
+  color: #d4a574;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.log-clear-btn {
+  padding: 4px 12px;
+  background: rgba(60, 0, 0, 0.6);
+  border: 1px solid #5a3a1e;
+  border-radius: 4px;
+  color: #a08060;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.log-content {
+  flex: 1;
+  padding: 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.log-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.log-content::-webkit-scrollbar-track {
+  background: rgba(42, 24, 18, 0.5);
+  border-radius: 3px;
+}
+
+.log-content::-webkit-scrollbar-thumb {
+  background: rgba(90, 58, 30, 0.8);
+  border-radius: 3px;
+}
+
+.log-item {
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(42, 24, 18, 0.5);
+  border-left: 3px solid #5a3a1e;
+  font-size: 13px;
+  line-height: 1.5;
+  animation: log-appear 0.3s ease-out;
+}
+
+@keyframes log-appear {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.log-time {
+  display: inline-block;
+  color: #8a6a4a;
+  font-size: 11px;
+  margin-right: 8px;
+  font-family: monospace;
+}
+
+.log-text {
+  color: #c0b0a0;
+}
+
+.log-item.play {
+  border-left-color: #d4a574;
+  background: rgba(212, 165, 116, 0.1);
+}
+
+.log-item.play .log-text {
+  color: #d4a574;
+}
+
+.log-item.challenge {
+  border-left-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.log-item.challenge .log-text {
+  color: #fbbf24;
+}
+
+.log-item.punishment {
+  border-left-color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.log-item.punishment .log-text {
+  color: #f87171;
+}
+
+.log-item.eliminate {
+  border-left-color: #991b1b;
+  background: rgba(153, 27, 27, 0.15);
+}
+
+.log-item.eliminate .log-text {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.log-item.system {
+  border-left-color: #8b5cf6;
+  background: rgba(139, 92, 246, 0.1);
+}
+
+.log-item.system .log-text {
+  color: #a78bfa;
+}
+
+.log-empty {
+  text-align: center;
+  color: #6b5a4a;
+  font-size: 13px;
+  padding: 20px;
 }
 
 .screen-shake {
@@ -612,7 +1338,7 @@ function onChat(payload) {
   position: absolute;
   inset: 0;
   margin-top: -60px;
-  background-image: url('../../static/images/game.png');
+  background-image: url('../../static/images/game.jpg');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -862,6 +1588,32 @@ function onChat(payload) {
   filter: grayscale(1);
 }
 
+/* 玩家编号标签 */
+.player-number {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 24px;
+  height: 24px;
+  background: linear-gradient(135deg, #5a3a1e 0%, #3a2616 100%);
+  border: 2px solid #d4a574;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #d4a574;
+  font-size: 11px;
+  font-weight: 700;
+  z-index: 10;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+
+.player-number.my-number {
+  border-color: #f59e0b;
+  color: #f59e0b;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.6);
+}
+
 .player-avatar {
   width: 24px;
   height: 24px;
@@ -917,6 +1669,16 @@ function onChat(payload) {
   line-height: 10px;
 }
 
+.last-played {
+  display: block;
+  color: #f59e0b;
+  font-size: 9px;
+  text-align: center;
+  margin-top: 2px;
+  font-weight: 600;
+  line-height: 10px;
+}
+
 .ai-tag,
 .dead-tag {
   position: absolute;
@@ -941,9 +1703,51 @@ function onChat(payload) {
 .center-area {
   flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   min-height: 80px;
+  gap: 10px;
+}
+
+.current-turn-banner {
+  padding: 8px 20px;
+  border-radius: 20px;
+  background: rgba(30, 10, 10, 0.95);
+  border: 2px solid #5c2e2e;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+.turn-text {
+  font-size: 14px;
+  font-weight: 700;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.turn-text.my-turn {
+  color: #10b981;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.turn-text.challenge-phase {
+  color: #f59e0b;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.turn-text.waiting {
+  color: #f59e0b;
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.6;
+  }
 }
 
 .last-play {
@@ -1003,26 +1807,32 @@ function onChat(payload) {
 }
 
 /* 自己的手牌区域 - 高度控制在100px内 */
+
+.my-info-row {
+  display: flex;
+}
+
 .my-area {
   background: rgba(30, 10, 10, 0.9);
   border: 2px solid #5c2e2e;
   border-radius: 6px;
-  padding: 8px;
+  padding: 8px 8px 20px 8px;
   box-shadow: 0 -3px 10px rgba(0, 0, 0, 0.5);
   flex-shrink: 0;
+  margin-bottom: 20px;
 }
 
 .my-info {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
-  height: 28px;
+  margin-bottom: 4px;
+  /* height: 28px; */
 }
 
 .my-avatar {
   width: 28px;
-  height: 28px;
+  /* height: 28px; */
   background: rgba(60, 30, 30, 0.6);
   border: 1px solid #5a3a1e;
   border-radius: 50%;
@@ -1055,7 +1865,7 @@ function onChat(payload) {
 .hand-cards {
   display: flex;
   gap: 6px;
-  margin-bottom: 8px;
+  margin-bottom: 2px;
   overflow-x: auto;
   padding-bottom: 2px;
 }
@@ -1098,6 +1908,7 @@ function onChat(payload) {
 .action-buttons {
   display: flex;
   gap: 8px;
+  margin-top: 8px;
 }
 
 .action-btn {
@@ -1302,4 +2113,179 @@ function onChat(payload) {
   border: none;
   box-shadow: 0 3px 8px rgba(233, 69, 96, 0.4);
 }
+
+/* 技能按钮样式 */
+.skill-btn {
+  background: linear-gradient(145deg, #8b5cf6 0%, #7c3aed 100%);
+  color: #fff;
+  border: 2px solid #a78bfa;
+}
+
+.skill-btn:disabled {
+  background: linear-gradient(145deg, #4b5563 0%, #374151 100%);
+  color: #9ca3af;
+  border-color: #6b7280;
+}
+
+/* 技能目标选择弹窗 */
+.skill-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+}
+
+.skill-modal {
+  background: linear-gradient(160deg, #1f1610 0%, #2a1c12 100%);
+  border: 2px solid #8b5cf6;
+  border-radius: 12px;
+  padding: 24px;
+  min-width: 400px;
+  max-width: 90%;
+  box-shadow: 0 8px 32px rgba(139, 92, 246, 0.3);
+}
+
+.skill-modal-title {
+  display: block;
+  color: #a78bfa;
+  font-size: 20px;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.skill-targets {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.skill-target {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(139, 92, 246, 0.1);
+  border: 2px solid #8b5cf6;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.skill-target:hover {
+  background: rgba(139, 92, 246, 0.2);
+  border-color: #a78bfa;
+  transform: translateX(4px);
+}
+
+.skill-target.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.target-avatar {
+  font-size: 24px;
+  width: 40px;
+  text-align: center;
+}
+
+.target-name {
+  flex: 1;
+  color: #d4a574;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.target-cards {
+  color: #a78bfa;
+  font-size: 14px;
+}
+
+.skill-cancel {
+  width: 100%;
+  background: linear-gradient(145deg, #4b5563 0%, #374151 100%);
+  color: #d4a574;
+  padding: 10px;
+  font-size: 14px;
+  border-radius: 6px;
+  border: 1px solid #6b7280;
+}
+
+/* Foxy偷看结果弹窗 */
+.skill-peek-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 400;
+}
+
+.skill-peek-modal {
+  background: linear-gradient(160deg, #1f1610 0%, #2a1c12 100%);
+  border: 3px solid #a78bfa;
+  border-radius: 16px;
+  padding: 32px;
+  text-align: center;
+  box-shadow: 0 12px 48px rgba(139, 92, 246, 0.5);
+  animation: peek-appear 0.3s ease-out;
+}
+
+@keyframes peek-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.peek-title {
+  display: block;
+  color: #a78bfa;
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 24px;
+}
+
+.peek-cards {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.peek-card {
+  width: 80px;
+  height: 110px;
+  background: linear-gradient(145deg, #2a1c12 0%, #1f1610 100%);
+  border: 2px solid #d4a574;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.peek-card-face {
+  color: #d4a574;
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.peek-timer {
+  display: block;
+  color: #f59e0b;
+  font-size: 16px;
+  font-weight: 600;
+}
+
 </style>

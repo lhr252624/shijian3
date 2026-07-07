@@ -24,6 +24,14 @@
 			}
 		},
 		{
+			"path": "pages/character-select/character-select",
+			"style": {
+				"navigationBarTitleText": "选择角色",
+				"navigationStyle": "custom",
+				"pageOrientation": "landscape"
+			}
+		},
+		{
 			"path": "pages/match-wait/match-wait",
 			"style": {
 				"navigationBarTitleText": "匹配中",

@@ -59,62 +59,74 @@ watch(() => props.visible, (val) => {
 <style scoped>
 .toast-container {
   position: fixed;
-  top: 40rpx;
+  top: 50rpx;
   left: 50%;
   transform: translateX(-50%);
   z-index: 9999;
-  animation: toast-in 0.3s ease;
+  animation: toast-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes toast-in {
   from {
     opacity: 0;
-    transform: translate(-50%, -20rpx);
+    transform: translate(-50%, -30rpx) scale(0.9);
   }
   to {
     opacity: 1;
-    transform: translate(-50%, 0);
+    transform: translate(-50%, 0) scale(1);
   }
 }
 
 .toast-content {
   display: flex;
   align-items: center;
-  gap: 12rpx;
-  padding: 16rpx 28rpx;
-  border-radius: 8rpx;
-  font-size: 24rpx;
-  font-weight: 400;
-  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(8rpx);
+  gap: 10rpx;
+  padding: 12rpx 24rpx;
+  border-radius: 6rpx;
+  font-size: 14px;
+  font-weight: 500;
   max-width: 80vw;
+  position: relative;
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.5),
+    0 8px 24px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .toast-container.error .toast-content {
-  background: rgba(120, 30, 25, 0.92);
-  border: 1px solid rgba(233, 69, 96, 0.6);
-  color: rgba(255, 228, 224, 0.95);
+  background: linear-gradient(135deg,
+    rgba(60, 25, 20, 0.95) 0%,
+    rgba(45, 20, 18, 0.95) 100%);
+  border: 1.5px solid rgba(180, 60, 50, 0.6);
+  color: #f5d4a0;
 }
 
 .toast-container.success .toast-content {
-  background: rgba(40, 90, 55, 0.92);
-  border: 1px solid rgba(74, 222, 128, 0.6);
-  color: rgba(216, 255, 228, 0.95);
+  background: linear-gradient(135deg,
+    rgba(35, 55, 30, 0.95) 0%,
+    rgba(25, 40, 22, 0.95) 100%);
+  border: 1.5px solid rgba(100, 150, 80, 0.6);
+  color: #d4e8a0;
 }
 
 .toast-container.info .toast-content {
-  background: rgba(30, 70, 120, 0.92);
-  border: 1px solid rgba(59, 130, 246, 0.6);
-  color: rgba(219, 234, 254, 0.95);
+  background: linear-gradient(135deg,
+    rgba(40, 35, 30, 0.95) 0%,
+    rgba(30, 25, 20, 0.95) 100%);
+  border: 1.5px solid rgba(120, 100, 70, 0.6);
+  color: #e8d4a0;
 }
 
 .toast-icon {
-  font-size: 26rpx;
+  font-size: 16px;
   line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
 }
 
 .toast-msg {
   flex: 1;
-  line-height: 1.4;
+  line-height: 1.5;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  letter-spacing: 0.3px;
 }
 </style>

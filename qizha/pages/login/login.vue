@@ -22,21 +22,31 @@
 
     <!-- 自定义加载组件 -->
     <Loading :visible="loading" text="登录中..." />
+
+    <!-- 自定义提示组件 -->
+    <Toast v-model:visible="toast.show" :message="toast.msg" :type="toast.type" />
   </view>
 </template>
 
 <script>
 import Loading from '../../components/Loading.vue'
+import Toast from '../../components/Toast.vue'
 
 export default {
   components: {
-    Loading
+    Loading,
+    Toast
   },
   data() {
     return {
       username: '111111',
       password: '111111',
-      loading: false
+      loading: false,
+      toast: {
+        show: false,
+        msg: '',
+        type: 'error'
+      }
     }
   },
   onLoad() {
@@ -53,6 +63,9 @@ export default {
     // 不要在这里解除横屏锁定，让下一个页面自己控制
   },
   methods: {
+    showToast(msg, type = 'error') {
+      this.toast = { show: true, msg, type }
+    },
     setLandscape() {
       // 强制横屏
       // #ifdef APP-PLUS
@@ -76,20 +89,14 @@ export default {
       // 验证：检查账号
       if (!this.username) {
         console.warn('验证失败: 账号为空')
-        uni.showToast({
-          title: '请输入账号',
-          icon: 'none'
-        })
+        this.showToast('请输入账号', 'error')
         return
       }
 
       // 验证：检查密码
       if (!this.password) {
         console.warn('验证失败: 密码为空')
-        uni.showToast({
-          title: '请输入密码',
-          icon: 'none'
-        })
+        this.showToast('请输入密码', 'error')
         return
       }
 
@@ -107,11 +114,7 @@ export default {
         console.log('登录成功，用户信息:', result.user)
 
         // 登录成功提示
-        uni.showToast({
-          title: '登录成功',
-          icon: 'success',
-          duration: 1500
-        })
+        this.showToast('登录成功', 'success')
 
         // 延迟跳转到大厅页面
         setTimeout(() => {
@@ -119,7 +122,7 @@ export default {
           uni.reLaunch({
             url: '/pages/lobby/lobby'
           })
-        }, 1500)
+        }, 1200)
       } catch (e) {
         console.error('登录失败:', e)
         console.error('错误详情:', {
@@ -137,11 +140,7 @@ export default {
         }
 
         console.log('显示错误提示:', errorMsg)
-        uni.showToast({
-          title: errorMsg,
-          icon: 'none',
-          duration: 2500
-        })
+        this.showToast(errorMsg, 'error')
       } finally {
         this.loading = false
         console.log('=== 登录流程结束 ===')
@@ -155,10 +154,7 @@ export default {
     },
     goToForgetPassword() {
       console.log('点击忘记密码')
-      uni.showToast({
-        title: '忘记密码功能开发中',
-        icon: 'none'
-      })
+      this.showToast('忘记密码功能开发中', 'info')
     }
   }
 }

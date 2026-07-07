@@ -64,7 +64,7 @@
       </view>
 
       <!-- 右侧开始游戏按钮：双层嵌套结构 -->
-      <view class="start-button-outer" @click="startMatch">
+      <view class="start-button-outer" @click="startGameWithCharacter">
         <view class="start-button-inner">
           <text class="start-title">开始游戏</text>
           <text class="start-subtitle"><span class="dash">——</span> 选择你的命运 <span class="dash">——</span></text>
@@ -214,6 +214,7 @@ function showToast(msg, type = 'error') {
 }
 
 async function startMatch() {
+  // 快速匹配 - 不选择角色,直接匹配
   loading.value = true
   try {
     await matchAPI.start()
@@ -226,6 +227,14 @@ async function startMatch() {
   } finally {
     loading.value = false
   }
+}
+
+// 新增: 开始游戏 - 选择角色后匹配
+function startGameWithCharacter() {
+  // 跳转到角色选择页面
+  uni.navigateTo({
+    url: '/pages/character-select/character-select'
+  })
 }
 
 async function createRoom() {
