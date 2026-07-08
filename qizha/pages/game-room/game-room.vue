@@ -1999,10 +1999,14 @@ function onChat(payload) {
 }
 
 .no-cards {
-  text-align: center;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
   color: #8a6a4a;
   padding: 16px;
   font-size: 12px;
+  height: 66px;
 }
 
 /* 操作按钮 - 高度24px */
