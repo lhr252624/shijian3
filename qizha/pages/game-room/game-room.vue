@@ -113,7 +113,7 @@
           <text class="card-count">{{ player.hand_count }} 张牌</text>
           <!-- 显示最近出牌信息 -->
           <text v-if="gameState.last_play && gameState.last_play.player_id === player.id" class="last-played">
-            刚出 {{ gameState.last_play.count }} 张 {{ gameState.last_play.claimed_card }}
+            刚出 {{ gameState.last_play.count }} 张 {{ gameState.last_play.claim }}
           </text>
           <view v-if="player.is_ai" class="ai-tag">AI</view>
           <view v-if="!player.is_alive" class="dead-tag">💀</view>
@@ -135,7 +135,7 @@
           <text class="last-play-label">上家出牌</text>
           <view class="last-play-cards">
             <view v-for="i in gameState.last_play.count" :key="i" class="play-card">
-              <text class="card-text">{{ gameState.last_play.claimed_card }}</text>
+              <text class="card-text">{{ gameState.last_play.claim }}</text>
             </view>
           </view>
           <text class="last-play-player">{{ lastPlayPlayerName }}</text>
@@ -147,7 +147,8 @@
 
       <!-- 自己的手牌区域 -->
       <view class="my-area">
-        <view class="my-info-row">
+        <!-- 第一行：个人信息 + 操作按钮 -->
+        <view class="top-info-row">
           <view class="my-info">
             <!-- 玩家编号 -->
             <view v-if="myPlayer" class="player-number my-number">P{{ myPlayer.seat_index + 1 }}</view>
@@ -160,8 +161,48 @@
             </view>
           </view>
 
-          <!-- 手牌 -->
-          <view v-if="myHandCards.length > 0" class="hand-cards">
+          <!-- 操作按钮组 -->
+          <view class="action-buttons-top">
+            <!-- 出牌按钮 - 放在最前面 -->
+            <button v-if="canPlayCard" class="top-btn play-btn" :disabled="selectedCards.length === 0" @tap="playCards">
+              出牌({{ selectedCards.length }})
+            </button>
+
+            <!-- 质疑按钮 -->
+            <button v-if="canChallenge" class="top-btn challenge-btn" @tap="challenge">
+              质疑
+            </button>
+
+            <!-- 跳过按钮 - 只在质疑阶段显示 -->
+            <button v-if="canPass && gameState?.phase === 'CHALLENGE'" class="top-btn pass-btn" @tap="passTurn">
+              放弃
+            </button>
+
+            <!-- 状态提示 -->
+            <text v-if="myPlayer && myPlayer.hand_count === 0 && gameState?.phase === 'PLAYING'" class="status-text">
+              手牌已空
+            </text>
+            <text v-else-if="gameState?.phase === 'CHALLENGE' && !hasAnyAction" class="status-text">
+              等待质疑...
+            </text>
+            <text v-else-if="!hasAnyAction && myPlayer && myPlayer.hand_count > 0" class="status-text">
+              <template v-if="gameState?.phase === 'CHALLENGE'">等待质疑...</template>
+              <template v-else-if="gameState?.phase === 'PLAYING'">等待操作...</template>
+              <template v-else>等待中...</template>
+            </text>
+          </view>
+        </view>
+
+        <!-- 第二行：技能按钮（侧边栏）+ 手牌 -->
+        <view class="cards-row">
+          <!-- Foxy技能按钮 -->
+          <button v-if="canUseSkill" class="skill-btn-sidebar" :disabled="skillUsed" @tap="showSkillTargetSelect">
+            <view class="skill-icon">🔍</view>
+            <text class="skill-label">{{ skillUsed ? '已用' : '偷看' }}</text>
+          </button>
+
+          <!-- 手牌区域 -->
+          <view v-if="myHandCards.length > 0" class="hand-cards-container">
             <view v-for="(card, idx) in myHandCards" :key="idx" class="hand-card"
               :class="{ selected: selectedCards.includes(idx) }" @tap="toggleCard(idx)">
               <text class="card-face">{{ card }}</text>
@@ -169,46 +210,6 @@
           </view>
           <view v-else class="no-cards">
             <text>手牌已出完</text>
-          </view>
-        </view>
-        <!-- 操作按钮 -->
-        <view class="action-buttons">
-          <!-- 手牌为0的提示 -->
-          <view v-if="myPlayer && myPlayer.hand_count === 0 && gameState?.phase === 'PLAYING'" class="waiting-turn">
-            <text>手牌已空，自动跳过</text>
-          </view>
-
-          <!-- CHALLENGE 阶段提示 -->
-          <view v-else-if="gameState?.phase === 'CHALLENGE' && !hasAnyAction" class="waiting-turn challenge-phase-hint">
-            <text>质疑阶段 - 等待其他玩家决定...</text>
-          </view>
-
-          <!-- 出牌按钮 - 仅当legal_actions包含PLAY_CARD -->
-          <button v-if="canPlayCard" class="action-btn play-btn" :disabled="selectedCards.length === 0"
-            @tap="playCards">
-            出牌 ({{ selectedCards.length }})
-          </button>
-
-          <!-- 质疑按钮 - 仅当legal_actions包含CHALLENGE -->
-          <button v-if="canChallenge" class="action-btn challenge-btn" @tap="challenge">
-            质疑
-          </button>
-
-          <!-- 放弃按钮 - 仅当legal_actions包含PASS -->
-          <button v-if="canPass" class="action-btn pass-btn" @tap="passTurn">
-            {{ gameState?.phase === 'CHALLENGE' ? '放弃质疑' : '跳过' }}
-          </button>
-
-          <!-- Foxy主动技能按钮 - 独立于legal_actions -->
-          <button v-if="canUseSkill" class="action-btn skill-btn" :disabled="skillUsed" @tap="showSkillTargetSelect">
-            {{ skillUsed ? '技能已使用' : '🔍 偷看手牌' }}
-          </button>
-
-          <!-- 等待提示 - 没有任何可用操作时显示 -->
-          <view v-if="!hasAnyAction && myPlayer && myPlayer.hand_count > 0" class="waiting-turn">
-            <text v-if="gameState?.phase === 'CHALLENGE'">等待其他玩家质疑...</text>
-            <text v-else-if="gameState?.phase === 'PLAYING'">等待其他玩家操作...</text>
-            <text v-else>等待游戏继续...</text>
           </view>
         </view>
       </view>
@@ -915,15 +916,15 @@ function onGameState(payload) {
     legal_actions: payload.legal_actions || [],
     last_play: payload.last_play ? {
       player_id: payload.last_play.player_id,
-      count: payload.last_play.card_count,
-      claimed_card: payload.last_play.claim
+      count: payload.last_play.count,
+      claim: payload.last_play.claim
     } : null
   }
 
   // 记录上家出牌日志
   if (payload.last_play) {
     const playerName = getPlayerName(payload.last_play.player_id)
-    addActionLog(`${playerName} 出了 ${payload.last_play.card_count} 张 ${payload.last_play.claim}`, 'play')
+    addActionLog(`${playerName} 出了 ${payload.last_play.count} 张 ${payload.last_play.claim}`, 'play')
   }
 
   // 找到当前操作的玩家
@@ -1828,6 +1829,137 @@ function onChat(payload) {
 .my-hp {
   display: flex;
   gap: 3px;
+}
+
+/* 第一行：个人信息 + 操作按钮 */
+.top-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.action-buttons-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* flex: 1; */
+}
+
+.top-btn {
+  width: 80px;
+  height: 32px;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  line-height: 32px;
+  text-align: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.top-btn.play-btn {
+  background: linear-gradient(180deg, #4ade80 0%, #22c55e 100%);
+  color: #000;
+  box-shadow: 0 3px 8px rgba(74, 222, 128, 0.4);
+}
+
+.top-btn.play-btn[disabled] {
+  background: #333;
+  color: #666;
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.top-btn.challenge-btn {
+  background: linear-gradient(180deg, #e94560 0%, #dc2626 100%);
+  color: #fff;
+  box-shadow: 0 3px 8px rgba(233, 69, 96, 0.4);
+}
+
+.top-btn.pass-btn {
+  background: linear-gradient(180deg, #888 0%, #666 100%);
+  color: #fff;
+}
+
+.status-text {
+  color: #8a6a4a;
+  font-size: 12px;
+  margin-left: 8px;
+}
+
+/* 第二行：技能侧边栏 + 手牌 */
+.cards-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.skill-btn-sidebar {
+  width: 80px;
+  height: 66px;
+  padding: 4px 8px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: linear-gradient(180deg, #7a3e3e 0%, #5c2e2e 100%);
+  border: 2px solid #8a4e4e;
+  border-radius: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
+}
+
+.skill-btn-sidebar[disabled] {
+  background: #333;
+  border-color: #555;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.skill-btn-sidebar:active:not([disabled]) {
+  transform: scale(0.95);
+}
+
+.skill-icon {
+  font-size: 18px;
+}
+
+.skill-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #d4a574;
+  text-align: center;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.skill-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #d4a574;
+  text-align: center;
+  line-height: 1;
+}
+
+.skill-btn-sidebar[disabled] .skill-label {
+  color: #666;
+}
+
+.hand-cards-container {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  flex: 1;
 }
 
 /* 手牌 */
