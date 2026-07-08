@@ -105,29 +105,55 @@
         </view>
       </view>
 
-      <!-- 对手区域（顶部剩余两个） -->
+      <!-- 对手区域（顶部只有一个） -->
       <view class="opponents-row">
-        <view v-for="player in opponents.slice(1)" :key="player.id" class="player-card"
-          :class="{ active: gameState.current_player === player.seat_index, eliminated: !player.is_alive }">
+        <view v-if="opponents[1]" class="player-card"
+          :class="{ active: gameState.current_player === opponents[1].seat_index, eliminated: !opponents[1].is_alive }">
           <!-- 玩家编号 -->
-          <view class="player-number">P{{ player.seat_index + 1 }}</view>
+          <view class="player-number">P{{ opponents[1].seat_index + 1 }}</view>
           <view class="player-avatar">
-            <text v-if="player.is_ai">🤖</text>
+            <text v-if="opponents[1].is_ai">🤖</text>
             <text v-else>👤</text>
           </view>
-          <text class="player-name">{{ player.nickname }}</text>
+          <text class="player-name">{{ opponents[1].nickname }}</text>
           <view class="player-hp">
             <view v-for="i in 6" :key="i" class="hp-dot"
-              :class="{ filled: i <= (player.bullets || player.punishment_count || 0) }">
+              :class="{ filled: i <= (opponents[1].bullets || opponents[1].punishment_count || 0) }">
             </view>
           </view>
-          <text class="card-count">{{ player.hand_count }} 张牌</text>
+          <text class="card-count">{{ opponents[1].hand_count }} 张牌</text>
           <!-- 显示最近出牌信息 -->
-          <text v-if="gameState.last_play && gameState.last_play.player_id === player.id" class="last-played">
+          <text v-if="gameState.last_play && gameState.last_play.player_id === opponents[1].id" class="last-played">
             刚出 {{ gameState.last_play.count }} 张 {{ gameState.last_play.claim }}
           </text>
-          <view v-if="player.is_ai" class="ai-tag">AI</view>
-          <view v-if="!player.is_alive" class="dead-tag">💀</view>
+          <view v-if="opponents[1].is_ai" class="ai-tag">AI</view>
+          <view v-if="!opponents[1].is_alive" class="dead-tag">💀</view>
+        </view>
+      </view>
+
+      <!-- 右侧对手 -->
+      <view v-if="opponents[2]" class="right-opponent">
+        <view class="player-card player-card-vertical"
+          :class="{ active: gameState.current_player === opponents[2].seat_index, eliminated: !opponents[2].is_alive }">
+          <!-- 玩家编号 -->
+          <view class="player-number">P{{ opponents[2].seat_index + 1 }}</view>
+          <view class="player-avatar">
+            <text v-if="opponents[2].is_ai">🤖</text>
+            <text v-else>👤</text>
+          </view>
+          <text class="player-name">{{ opponents[2].nickname }}</text>
+          <view class="player-hp">
+            <view v-for="i in 6" :key="i" class="hp-dot"
+              :class="{ filled: i <= (opponents[2].bullets || opponents[2].punishment_count || 0) }">
+            </view>
+          </view>
+          <text class="card-count">{{ opponents[2].hand_count }} 张牌</text>
+          <!-- 显示最近出牌信息 -->
+          <text v-if="gameState.last_play && gameState.last_play.player_id === opponents[2].id" class="last-played">
+            刚出 {{ gameState.last_play.count }} 张 {{ gameState.last_play.claim }}
+          </text>
+          <view v-if="opponents[2].is_ai" class="ai-tag">AI</view>
+          <view v-if="!opponents[2].is_alive" class="dead-tag">💀</view>
         </view>
       </view>
 
@@ -1734,6 +1760,15 @@ function sendChatMessage() {
 .left-opponent {
   position: absolute;
   left: 20px;
+  top: 50%;
+  transform: translateY(-100%);
+  z-index: 10;
+}
+
+/* 右侧对手 */
+.right-opponent {
+  position: absolute;
+  right: 20px;
   top: 50%;
   transform: translateY(-100%);
   z-index: 10;
