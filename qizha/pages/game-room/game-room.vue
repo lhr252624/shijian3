@@ -220,7 +220,8 @@
             <!-- 操作按钮组 -->
             <view class="action-buttons-top">
               <!-- 出牌按钮 - 放在最前面 -->
-              <button v-if="canPlayCard" class="top-btn play-btn" :disabled="selectedCards.length === 0"
+              <button v-if="canPlayCard" class="top-btn play-btn"
+                :disabled="selectedCards.length === 0 || myHandCards.length === 0"
                 @tap="playCards">
                 出牌({{ selectedCards.length }})
               </button>
@@ -230,14 +231,14 @@
                 质疑
               </button>
 
-              <!-- 跳过按钮 - 只在质疑阶段显示 -->
-              <button v-if="canPass && gameState?.phase === 'CHALLENGE'" class="top-btn pass-btn" @tap="passTurn">
+              <!-- 跳过按钮 - 只在质疑阶段显示，且不能是刚出牌的玩家 -->
+              <button v-if="canPass && gameState?.phase === 'CHALLENGE' && !isLastPlayByMe" class="top-btn pass-btn" @tap="passTurn">
                 放弃
               </button>
 
               <!-- 状态提示 -->
               <text v-if="myPlayer && myPlayer.hand_count === 0 && gameState?.phase === 'PLAYING'" class="status-text">
-                手牌已空
+                手牌已空，自动跳过
               </text>
               <text v-else-if="gameState?.phase === 'CHALLENGE' && !hasAnyAction" class="status-text">
                 等待质疑...
@@ -564,6 +565,8 @@ const showSkillButton = computed(() => {
 const canUseSkill = computed(() => {
   // 只有Foxy有主动技能
   if (myCharacter.value !== 'foxy') return false
+  // 必须有手牌
+  if (myHandCards.value.length === 0) return false
   // 必须是游戏进行中（PLAYING阶段）
   if (gameState.value?.phase !== 'PLAYING') return false
   // 必须是自己的出牌回合
@@ -589,6 +592,12 @@ const lastPlayPlayerSeatIndex = computed(() => {
   const playerId = gameState.value.last_play.player_id
   const player = gameState.value.players?.find(p => p.id === playerId)
   return player?.seat_index ?? 0
+})
+
+// 判断最后出牌的是否是自己
+const isLastPlayByMe = computed(() => {
+  if (!gameState.value?.last_play) return false
+  return gameState.value.last_play.player_id === myPlayerId.value
 })
 
 const currentPlayerName = computed(() => {
@@ -824,6 +833,78 @@ watch(() => gameLogs.value.length, (newLength) => {
     })
   }
 })
+
+// 添加防抖标记，避免重复触发
+let autoPassTimer = null
+let lastAutoPassKey = ''
+
+// 监听游戏状态变化，自动跳过手牌为0的回合
+watch(
+  () => ({
+    currentPlayer: gameState.value?.current_player,
+    mySeatIndex: myPlayer.value?.seat_index,
+    handCount: myPlayer.value?.hand_count || 0,
+    phase: gameState.value?.phase,
+    legalActions: gameState.value?.legal_actions || [],
+    currentTurn: gameState.value?.current_turn || 0
+  }),
+  (newVal, oldVal) => {
+    console.log('🔍 watch触发 - 游戏状态变化:', {
+      currentPlayer: newVal.currentPlayer,
+      mySeatIndex: newVal.mySeatIndex,
+      handCount: newVal.handCount,
+      phase: newVal.phase,
+      legalActions: newVal.legalActions,
+      currentTurn: newVal.currentTurn
+    })
+
+    // 当轮到自己、手牌为0时，自动跳过（不管legal_actions是否包含PASS）
+    const isMyTurn = newVal.currentPlayer === newVal.mySeatIndex
+    const canPass = newVal.legalActions.includes('PASS')
+
+    console.log('🔍 条件检查:', {
+      isMyTurn,
+      canPass,
+      '手牌为0': newVal.handCount === 0
+    })
+
+    // 修改条件：只要轮到自己且手牌为0，就自动跳过
+    // 在PLAYING阶段：手牌为0则无法出牌，自动跳过
+    // 在CHALLENGE阶段：如果是自己出的牌，不应该质疑自己，自动跳过
+    if (isMyTurn && newVal.handCount === 0 && (newVal.phase === 'PLAYING' || newVal.phase === 'CHALLENGE')) {
+      // 生成唯一key，避免同一回合重复触发
+      const autoPassKey = `${newVal.currentTurn}-${newVal.mySeatIndex}-${newVal.phase}`
+
+      if (lastAutoPassKey === autoPassKey) {
+        console.log('⏭️ 已经处理过这个回合的自动跳过，忽略')
+        return
+      }
+
+      lastAutoPassKey = autoPassKey
+
+      console.log('✅ 检测到手牌为0且轮到自己，准备自动跳过回合（忽略legal_actions）')
+      console.log('当前阶段:', newVal.phase, '座位:', newVal.mySeatIndex, '手牌数:', newVal.handCount)
+
+      // 清除之前的定时器
+      if (autoPassTimer) {
+        clearTimeout(autoPassTimer)
+      }
+
+      autoPassTimer = setTimeout(() => {
+        console.log('🚀 执行自动跳过 - 强制发送PASS')
+        // 直接发送PASS，不依赖passTurn函数（因为canPass可能为false）
+        wsClient.send('PASS')
+
+        // 记录日志
+        const myName = myPlayer.value ? `P${myPlayer.value.seat_index + 1}-${authStore.user?.nickname || '我'}` : '我'
+        addActionLog(`${myName} 手牌为空，自动跳过`, 'info')
+
+        autoPassTimer = null
+      }, 500)
+    }
+  },
+  { deep: true, immediate: false }
+)
 
 async function loadRoomData() {
   try {
@@ -1136,6 +1217,9 @@ function onGameState(payload) {
   // 检测轮次变化：如果轮次增加，说明进入新轮次
   if (previousRound.value !== null && payload.current_round > previousRound.value) {
     addGameLog(`🎯 第 ${payload.current_round} 轮开始 - 目标牌：${payload.target_card}`, LogType.ROUND_START)
+    // 重置Foxy技能使用状态（每个大轮次可以使用一次）
+    skillUsed.value = false
+    console.log('新轮次开始，重置Foxy技能使用状态')
   }
   previousRound.value = payload.current_round
 
