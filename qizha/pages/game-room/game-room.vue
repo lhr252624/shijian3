@@ -79,21 +79,6 @@
 
     <!-- 游戏区域 -->
     <view v-if="gameState && gameState.phase !== 'GAME_OVER'" class="game-area">
-      <!-- 行动日志面板 -->
-      <view class="action-log-panel">
-        <view class="log-header">
-          <text class="log-title">📋 行动日志</text>
-          <button class="log-clear-btn" @tap="clearActionLog">清空</button>
-        </view>
-        <scroll-view class="log-content" scroll-y="true" :scroll-top="logScrollTop">
-          <view v-for="(log, index) in actionLogs" :key="index" class="log-item" :class="log.type">
-            <text class="log-time">{{ log.time }}</text>
-            <text class="log-text">{{ log.message }}</text>
-          </view>
-          <view v-if="actionLogs.length === 0" class="log-empty">暂无行动记录</view>
-        </scroll-view>
-      </view>
-
       <!-- 对手区域 -->
       <view class="opponents-row">
         <view v-for="player in opponents" :key="player.id" class="player-card"
@@ -145,72 +130,90 @@
         </view>
       </view>
 
-      <!-- 自己的手牌区域 -->
-      <view class="my-area">
-        <!-- 第一行：个人信息 + 操作按钮 -->
-        <view class="top-info-row">
-          <view class="my-info">
-            <!-- 玩家编号 -->
-            <view v-if="myPlayer" class="player-number my-number">P{{ myPlayer.seat_index + 1 }}</view>
-            <view class="my-avatar">👤</view>
-            <view class="my-details">
-              <text class="my-name">{{ authStore.user?.nickname || '我' }}</text>
-              <view class="my-hp">
-                <view v-for="i in 6" :key="i" class="hp-dot" :class="{ filled: i <= myPunishmentCount }"></view>
+      <!-- 底部区域：手牌区（70%）+ 日志区（30%） -->
+      <view class="bottom-container">
+        <!-- 自己的手牌区域 -->
+        <view class="my-area">
+          <!-- 第一行：个人信息 + 操作按钮 -->
+          <view class="top-info-row">
+            <view class="my-info">
+              <!-- 玩家编号 -->
+              <view v-if="myPlayer" class="player-number my-number">P{{ myPlayer.seat_index + 1 }}</view>
+              <view class="my-avatar">👤</view>
+              <view class="my-details">
+                <text class="my-name">{{ authStore.user?.nickname || '我' }}</text>
+                <view class="my-hp">
+                  <view v-for="i in 6" :key="i" class="hp-dot" :class="{ filled: i <= myPunishmentCount }"></view>
+                </view>
               </view>
+            </view>
+
+            <!-- 操作按钮组 -->
+            <view class="action-buttons-top">
+              <!-- 出牌按钮 - 放在最前面 -->
+              <button v-if="canPlayCard" class="top-btn play-btn" :disabled="selectedCards.length === 0" @tap="playCards">
+                出牌({{ selectedCards.length }})
+              </button>
+
+              <!-- 质疑按钮 -->
+              <button v-if="canChallenge" class="top-btn challenge-btn" @tap="challenge">
+                质疑
+              </button>
+
+              <!-- 跳过按钮 - 只在质疑阶段显示 -->
+              <button v-if="canPass && gameState?.phase === 'CHALLENGE'" class="top-btn pass-btn" @tap="passTurn">
+                放弃
+              </button>
+
+              <!-- 状态提示 -->
+              <text v-if="myPlayer && myPlayer.hand_count === 0 && gameState?.phase === 'PLAYING'" class="status-text">
+                手牌已空
+              </text>
+              <text v-else-if="gameState?.phase === 'CHALLENGE' && !hasAnyAction" class="status-text">
+                等待质疑...
+              </text>
+              <text v-else-if="!hasAnyAction && myPlayer && myPlayer.hand_count > 0" class="status-text">
+                <template v-if="gameState?.phase === 'CHALLENGE'">等待质疑...</template>
+                <template v-else-if="gameState?.phase === 'PLAYING'">等待操作...</template>
+                <template v-else>等待中...</template>
+              </text>
             </view>
           </view>
 
-          <!-- 操作按钮组 -->
-          <view class="action-buttons-top">
-            <!-- 出牌按钮 - 放在最前面 -->
-            <button v-if="canPlayCard" class="top-btn play-btn" :disabled="selectedCards.length === 0" @tap="playCards">
-              出牌({{ selectedCards.length }})
+          <!-- 第二行：技能按钮（侧边栏）+ 手牌 -->
+          <view class="cards-row">
+            <!-- Foxy技能按钮 -->
+            <button v-if="canUseSkill" class="skill-btn-sidebar" :disabled="skillUsed" @tap="showSkillTargetSelect">
+              <view class="skill-icon">🔍</view>
+              <text class="skill-label">{{ skillUsed ? '已用' : '偷看' }}</text>
             </button>
 
-            <!-- 质疑按钮 -->
-            <button v-if="canChallenge" class="top-btn challenge-btn" @tap="challenge">
-              质疑
-            </button>
-
-            <!-- 跳过按钮 - 只在质疑阶段显示 -->
-            <button v-if="canPass && gameState?.phase === 'CHALLENGE'" class="top-btn pass-btn" @tap="passTurn">
-              放弃
-            </button>
-
-            <!-- 状态提示 -->
-            <text v-if="myPlayer && myPlayer.hand_count === 0 && gameState?.phase === 'PLAYING'" class="status-text">
-              手牌已空
-            </text>
-            <text v-else-if="gameState?.phase === 'CHALLENGE' && !hasAnyAction" class="status-text">
-              等待质疑...
-            </text>
-            <text v-else-if="!hasAnyAction && myPlayer && myPlayer.hand_count > 0" class="status-text">
-              <template v-if="gameState?.phase === 'CHALLENGE'">等待质疑...</template>
-              <template v-else-if="gameState?.phase === 'PLAYING'">等待操作...</template>
-              <template v-else>等待中...</template>
-            </text>
+            <!-- 手牌区域 -->
+            <view v-if="myHandCards.length > 0" class="hand-cards-container">
+              <view v-for="(card, idx) in myHandCards" :key="idx" class="hand-card"
+                :class="{ selected: selectedCards.includes(idx) }" @tap="toggleCard(idx)">
+                <text class="card-face">{{ card }}</text>
+              </view>
+            </view>
+            <view v-else class="no-cards">
+              <text>手牌已出完</text>
+            </view>
           </view>
         </view>
 
-        <!-- 第二行：技能按钮（侧边栏）+ 手牌 -->
-        <view class="cards-row">
-          <!-- Foxy技能按钮 -->
-          <button v-if="canUseSkill" class="skill-btn-sidebar" :disabled="skillUsed" @tap="showSkillTargetSelect">
-            <view class="skill-icon">🔍</view>
-            <text class="skill-label">{{ skillUsed ? '已用' : '偷看' }}</text>
-          </button>
-
-          <!-- 手牌区域 -->
-          <view v-if="myHandCards.length > 0" class="hand-cards-container">
-            <view v-for="(card, idx) in myHandCards" :key="idx" class="hand-card"
-              :class="{ selected: selectedCards.includes(idx) }" @tap="toggleCard(idx)">
-              <text class="card-face">{{ card }}</text>
+        <!-- 行动日志面板 -->
+        <view class="action-log-panel">
+          <view class="log-header">
+            <text class="log-title">📋 行动日志</text>
+            <button class="log-clear-btn" @tap="clearActionLog">清空</button>
+          </view>
+          <scroll-view class="log-content" scroll-y="true" :scroll-top="logScrollTop">
+            <view v-for="(log, index) in actionLogs" :key="index" class="log-item" :class="log.type">
+              <text class="log-time">{{ log.time }}</text>
+              <text class="log-text">{{ log.message }}</text>
             </view>
-          </view>
-          <view v-else class="no-cards">
-            <text>手牌已出完</text>
-          </view>
+            <view v-if="actionLogs.length === 0" class="log-empty">暂无行动记录</view>
+          </scroll-view>
         </view>
       </view>
     </view>
@@ -1120,19 +1123,15 @@ function onChat(payload) {
 
 /* 行动日志面板 */
 .action-log-panel {
-  position: fixed;
-  top: 70px;
-  right: 20px;
-  width: 320px;
-  height: 400px;
+  flex: 3;
   background: linear-gradient(160deg, rgba(26, 15, 10, 0.95) 0%, rgba(42, 24, 18, 0.95) 100%);
   border: 2px solid #5a3a1e;
   border-radius: 12px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8);
-  z-index: 100;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 0;
 }
 
 .log-header {
@@ -1776,6 +1775,13 @@ function onChat(payload) {
   padding: 16px;
 }
 
+/* 底部容器：手牌区（70%）+ 日志区（30%） */
+.bottom-container {
+  display: flex;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
 /* 自己的手牌区域 - 高度控制在100px内 */
 
 .my-info-row {
@@ -1783,13 +1789,13 @@ function onChat(payload) {
 }
 
 .my-area {
+  flex: 7;
   background: rgba(30, 10, 10, 0.9);
   border: 2px solid #5c2e2e;
   border-radius: 6px;
   padding: 8px 8px 20px 8px;
   box-shadow: 0 -3px 10px rgba(0, 0, 0, 0.5);
   flex-shrink: 0;
-  margin-bottom: 20px;
 }
 
 .my-info {

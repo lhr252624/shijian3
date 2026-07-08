@@ -1018,7 +1018,7 @@ async function handleJoinRoom(room) {
 .room-list-modal {
   width: 90vw;
   max-width: 900px;
-  height: 80vh;
+  height: 95vh;
   max-height: 500px;
   background: linear-gradient(160deg, #1f1610 0%, #2a1c12 100%);
   border: 3px solid #5a3a1e;
