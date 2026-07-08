@@ -226,17 +226,19 @@
                 出牌({{ selectedCards.length }})
               </button>
 
-              <!-- 质疑按钮 - 手牌为0时禁用 -->
+              <!-- 质疑按钮 - 手牌为0时禁用，已质疑后也禁用 -->
               <button v-if="canChallenge" class="top-btn challenge-btn"
-                :disabled="myHandCards.length === 0"
+                :disabled="myHandCards.length === 0 || hasChallenged"
                 @tap="challenge">
-                质疑
+                {{ hasChallenged ? '已质疑' : '质疑' }}
               </button>
 
-              <!-- 跳过按钮 - 只在质疑阶段显示，且不能是刚出牌的玩家，手牌为0时不显示（自动跳过） -->
+              <!-- 跳过按钮 - 只在质疑阶段显示，且不能是刚出牌的玩家，手牌为0时不显示（自动跳过），已放弃后禁用 -->
               <button v-if="canPass && gameState?.phase === 'CHALLENGE' && !isLastPlayByMe && myHandCards.length > 0"
-                class="top-btn pass-btn" @tap="passTurn">
-                放弃
+                class="top-btn pass-btn"
+                :disabled="hasPassedChallenge"
+                @tap="passTurn">
+                {{ hasPassedChallenge ? '已放弃' : '放弃' }}
               </button>
 
               <!-- 状态提示 -->
@@ -450,6 +452,10 @@ const addGameLog = (text, type = LogType.PLAY_CARD) => {
 const skillUsed = ref(false)
 const showSkillTargets = ref(false)
 const skillPeekResult = ref(null)
+
+// 质疑阶段操作状态追踪
+const hasPassedChallenge = ref(false)
+const hasChallenged = ref(false)
 
 // 行动日志
 const actionLogs = ref([])
@@ -875,11 +881,9 @@ watch(
     })
 
     // 自动跳过逻辑：
-    // 1. PLAYING阶段：轮到自己且手牌为0，自动跳过
-    // 2. CHALLENGE阶段：手牌为0且可以PASS（不管是不是自己的回合），自动跳过
-    const shouldAutoPass =
-      (newVal.phase === 'PLAYING' && isMyTurn && newVal.handCount === 0) ||
-      (newVal.phase === 'CHALLENGE' && newVal.handCount === 0 && canPass)
+    // 只在PLAYING阶段：轮到自己且手牌为0时，自动跳过
+    // CHALLENGE阶段不自动跳过，允许玩家选择是否质疑
+    const shouldAutoPass = newVal.phase === 'PLAYING' && isMyTurn && newVal.handCount === 0
 
     if (shouldAutoPass) {
       // 生成唯一key，避免同一回合重复触发
@@ -1080,6 +1084,15 @@ function challenge() {
   const targetId = gameState.value?.last_play?.player_id
   if (!targetId) return
 
+  // 防止重复点击
+  if (hasChallenged.value) {
+    showToast('已发起质疑，等待结果', 'info')
+    return
+  }
+
+  // 标记已质疑
+  hasChallenged.value = true
+
   wsClient.send('CHALLENGE', {
     target_player_id: targetId
   })
@@ -1088,14 +1101,29 @@ function challenge() {
   const myName = myPlayer.value ? `P${myPlayer.value.seat_index + 1}-${authStore.user?.nickname || '我'}` : '我'
   const targetName = getPlayerName(targetId)
   addActionLog(`${myName} 选择质疑 ${targetName}`, 'challenge')
+
+  // 显示反馈提示
+  showToast('已发起质疑，等待结果揭晓', 'success')
 }
 
 function passTurn() {
+  // 防止重复点击
+  if (hasPassedChallenge.value) {
+    showToast('已选择放弃，等待其他玩家', 'info')
+    return
+  }
+
+  // 标记已放弃
+  hasPassedChallenge.value = true
+
   wsClient.send('PASS')
 
   // 记录放弃质疑
   const myName = myPlayer.value ? `P${myPlayer.value.seat_index + 1}-${authStore.user?.nickname || '我'}` : '我'
   addActionLog(`${myName} 选择不质疑，轮到下家`, 'info')
+
+  // 显示反馈提示
+  showToast('已放弃质疑，等待其他玩家决策', 'success')
 
   resetSelection()
 }
@@ -1241,6 +1269,22 @@ function onGameState(payload) {
 
   // 检测阶段变化
   const phaseChanged = previousPhase.value !== payload.phase
+
+  // 阶段变化时重置质疑相关状态
+  if (phaseChanged) {
+    // 离开质疑阶段时，重置质疑操作标记
+    if (previousPhase.value === 'CHALLENGE' && payload.phase !== 'CHALLENGE') {
+      hasPassedChallenge.value = false
+      hasChallenged.value = false
+      console.log('离开质疑阶段，重置质疑操作标记')
+    }
+    // 进入质疑阶段时，也重置标记（防止状态残留）
+    if (payload.phase === 'CHALLENGE') {
+      hasPassedChallenge.value = false
+      hasChallenged.value = false
+      console.log('进入质疑阶段，重置质疑操作标记')
+    }
+  }
 
   // 1. 从 PLAYING → CHALLENGE: 说明有人出牌了
   if (previousPhase.value === 'PLAYING' && payload.phase === 'CHALLENGE' && payload.last_play) {
@@ -1390,6 +1434,11 @@ function onChallengeResult(payload) {
       console.error('找不到玩家信息！challengerId:', challengerId, 'targetId:', targetId)
     }
   }
+
+  // 质疑结果出来后，重置质疑操作标记
+  hasPassedChallenge.value = false
+  hasChallenged.value = false
+  console.log('质疑结果已处理，重置质疑操作标记')
 }
 
 function onRoulette(payload) {
