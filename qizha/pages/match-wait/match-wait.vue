@@ -31,7 +31,8 @@ function onMatchFound(payload) {
   if (timer) clearInterval(timer)
   const roomId = payload.room_id
   if (roomId) {
-    uni.redirectTo({
+    // 使用 reLaunch 替代 redirectTo，确保清空页面栈，停止 lobby 的轮询
+    uni.reLaunch({
       url: `/pages/game-room/game-room?id=${roomId}`
     })
   }

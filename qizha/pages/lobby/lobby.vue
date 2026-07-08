@@ -33,17 +33,9 @@
     <!-- 底部操作按钮区 -->
     <view class="bottom-actions">
       <!-- 左侧三个按钮：双层嵌套结构 -->
-      <view class="action-button-outer" @click="startMatch">
-        <view class="action-button-inner">
-          <image class="action-icon-img" src="../../static/images/puke1.png" mode="aspectFit" />
-          <view class="action-texts">
-            <text class="action-title">快速匹配</text>
-            <text class="action-subtitle">随机加入一场游戏</text>
-          </view>
-        </view>
-      </view>
 
-      <view class="action-button-outer" @click="createRoom">
+
+      <view class="action-button-outer" @click="showCreateRoomDialog">
         <view class="action-button-inner">
           <text class="action-icon iconfont">&#xe62e;</text>
           <view class="action-texts">
@@ -53,7 +45,7 @@
         </view>
       </view>
 
-      <view class="action-button-outer">
+      <view class="action-button-outer" @click="showRoomListView">
         <view class="action-button-inner">
           <text class="action-icon iconfont">&#xe607;</text>
           <view class="action-texts">
@@ -63,6 +55,14 @@
         </view>
       </view>
 
+      <view style="width:180px;"></view>
+      <!-- <view class="action-button-inner">
+          <image class="action-icon-img" src="../../static/images/puke1.png" mode="aspectFit" />
+          <view class="action-texts">
+            <text class="action-title">快速匹配</text>
+            <text class="action-subtitle">随机加入一场游戏</text>
+          </view>
+        </view> -->
       <!-- 右侧开始游戏按钮：双层嵌套结构 -->
       <view class="start-button-outer" @click="startGameWithCharacter">
         <view class="start-button-inner">
@@ -73,8 +73,67 @@
     </view>
 
     <!-- 组件 -->
-    <Toast v-if="toast.show" :msg="toast.msg" :type="toast.type" @close="toast.show = false" />
+    <Toast :visible="toast.show" :message="toast.msg" :type="toast.type" @update:visible="toast.show = false" />
     <Loading v-if="loading" />
+
+    <!-- 创建房间输入对话框 -->
+    <InputDialog v-model:visible="createRoomDialog.show" :title="createRoomDialog.title"
+      :placeholder="createRoomDialog.placeholder" @confirm="handleCreateRoom" />
+
+    <!-- 房间列表查看界面 -->
+    <view v-if="showRoomList" class="room-list-overlay" @click.self="closeRoomList">
+      <view class="room-list-modal">
+        <view class="room-list-header">
+          <text class="room-list-title">🏠 可用房间</text>
+          <view class="room-list-close" @click="closeRoomList">×</view>
+        </view>
+
+        <scroll-view class="room-list-content" scroll-y="true">
+          <view v-if="rooms.length === 0" class="room-empty">
+            <text class="empty-icon">🚫</text>
+            <text class="empty-text">暂无可用房间</text>
+            <text class="empty-hint">创建一个新房间开始游戏吧！</text>
+          </view>
+
+          <view v-else class="room-grid">
+            <view v-for="room in rooms" :key="room.id" class="room-item" :class="{ disabled: !canJoinRoom(room) }"
+              @click="handleJoinRoom(room)">
+              <view class="room-item-header">
+                <text class="room-name">{{ room.room_name || `房间 ${room.id}` }}</text>
+                <view class="room-status-badge" :class="getRoomStatusClass(room)">
+                  {{ getRoomStatusText(room) }}
+                </view>
+              </view>
+
+              <view class="room-item-body">
+                <view class="room-info-row">
+                  <text class="room-info-label">👥 玩家</text>
+                  <text class="room-info-value">{{ room.current_players }}/{{ room.max_players }}</text>
+                </view>
+
+                <view class="room-info-row">
+                  <text class="room-info-label">👤 房主</text>
+                  <text class="room-info-value">ID {{ room.creator_id }}</text>
+                </view>
+              </view>
+
+              <view class="room-item-footer">
+                <text v-if="canJoinRoom(room)" class="join-hint">点击加入</text>
+                <text v-else class="join-disabled">{{ getJoinDisabledReason(room) }}</text>
+              </view>
+            </view>
+          </view>
+        </scroll-view>
+
+        <!-- 底部创建房间按钮 -->
+        <view class="room-list-footer">
+          <button class="room-list-create-btn" @click="showCreateRoomDialog">
+            <text class="create-btn-icon">+</text>
+            <text class="create-btn-text">创建新房间</text>
+          </button>
+        </view>
+      </view>
+    </view>
 
     <!-- 游戏规则模态框 -->
     <view v-if="showRules" class="rules-overlay" @click.self="showRules = false">
@@ -137,20 +196,29 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, onActivated } from 'vue'
+import { onShow, onHide } from '@dcloudio/uni-app'
 import { useAuthStore } from '../../stores/auth'
 import { lobbyAPI, roomAPI, matchAPI } from '../../utils/api'
 import wsClient from '../../utils/websocket'
 import Toast from '../../components/Toast.vue'
 import Loading from '../../components/Loading.vue'
 import RulesModal from '../../components/RulesModal.vue'
+import InputDialog from '../../components/InputDialog.vue'
 
 const authStore = useAuthStore()
 
 const lobbyData = ref({ online_count: 0, active_rooms: [] })
 const rooms = ref([])
 const showRules = ref(false)
+const showRoomList = ref(false)
 const loading = ref(false)
 const toast = ref({ show: false, msg: '', type: 'error' })
+
+const createRoomDialog = ref({
+  show: false,
+  title: '创建房间',
+  placeholder: '请输入房间名称'
+})
 
 let pollTimer = null
 
@@ -176,13 +244,9 @@ onMounted(() => {
 
   // 连接 WebSocket
   wsClient.connect()
-  wsClient.on('connected', fetchLobby)
 
-  // 初始化数据
+  // 初始化数据 - 仅获取一次在线人数,不再轮询房间列表
   fetchLobby()
-
-  // 定时轮询更新大厅数据
-  pollTimer = setInterval(fetchLobby, 5000)
 })
 
 // 页面显示时也设置横屏（防止其他页面解锁后无法恢复）
@@ -191,23 +255,47 @@ onActivated(() => {
   setLandscape()
 })
 
-onUnmounted(() => {
-  wsClient.off('connected', fetchLobby)
-  if (pollTimer) {
-    clearInterval(pollTimer)
-    pollTimer = null
+// 页面显示时仅获取一次数据
+onShow(() => {
+  console.log('=== 大厅页面 onShow ===')
+  fetchLobby()
+  // 如果房间列表正在显示，也刷新房间列表
+  if (showRoomList.value) {
+    fetchRooms()
   }
+})
+
+// 页面隐藏时的清理
+onHide(() => {
+  console.log('=== 大厅页面 onHide ===')
+  stopRoomPolling()
+})
+
+onUnmounted(() => {
+  console.log('=== 大厅页面卸载 ===')
+  stopRoomPolling()
 })
 
 async function fetchLobby() {
   try {
     const res = await lobbyAPI.get()
     lobbyData.value = res.data || {}
-    rooms.value = res.data?.active_rooms || []
   } catch (e) {
     console.error('Fetch lobby error:', e)
   }
 }
+
+async function fetchRooms() {
+  try {
+    const res = await roomAPI.list()
+    rooms.value = res.data || []
+    console.log('房间列表:', rooms.value)
+  } catch (e) {
+    console.error('获取房间列表失败:', e)
+    showToast('获取房间列表失败', 'error')
+  }
+}
+
 
 function showToast(msg, type = 'error') {
   toast.value = { show: true, msg, type }
@@ -237,30 +325,109 @@ function startGameWithCharacter() {
   })
 }
 
-async function createRoom() {
-  uni.showModal({
-    title: '创建房间',
-    editable: true,
-    placeholderText: '输入房间名称',
-    success: async (res) => {
-      if (res.confirm && res.content) {
-        loading.value = true
-        try {
-          const result = await roomAPI.create(res.content)
-          const roomId = result.data?.id || result.data?.room_id
-          if (roomId) {
-            uni.navigateTo({
-              url: `/pages/game-room/game-room?id=${roomId}`
-            })
-          }
-        } catch (e) {
-          showToast(e.response?.data?.msg || '创建失败')
-        } finally {
-          loading.value = false
-        }
-      }
+// 显示创建房间对话框
+function showCreateRoomDialog() {
+  createRoomDialog.value.show = true
+}
+
+// 处理创建房间
+async function handleCreateRoom(roomName) {
+  loading.value = true
+  try {
+    const result = await roomAPI.create(roomName)
+    const roomId = result.data?.id || result.data?.room_id
+    if (roomId) {
+      showToast('房间创建成功', 'success')
+      // 停止轮询
+      stopRoomPolling()
+      // 跳转到房间页面
+      uni.navigateTo({
+        url: `/pages/game-room/game-room?id=${roomId}`
+      })
     }
-  })
+  } catch (e) {
+    showToast(e.response?.data?.msg || '创建房间失败', 'error')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 显示房间列表
+function showRoomListView() {
+  showRoomList.value = true
+  fetchRooms()
+  startRoomPolling()
+}
+
+// 关闭房间列表
+function closeRoomList() {
+  showRoomList.value = false
+  stopRoomPolling()
+}
+
+// 开始轮询房间列表
+function startRoomPolling() {
+  stopRoomPolling() // 先清除旧的定时器
+  pollTimer = setInterval(() => {
+    if (showRoomList.value) {
+      fetchRooms()
+    }
+  }, 3000) // 每3秒刷新一次
+}
+
+// 停止轮询
+function stopRoomPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
+// 判断是否可以加入房间
+function canJoinRoom(room) {
+  return room.status === 'WAITING' && room.current_players < room.max_players
+}
+
+// 获取房间状态样式类
+function getRoomStatusClass(room) {
+  switch (room.status) {
+    case 'WAITING':
+      return 'status-waiting'
+    case 'PLAYING':
+      return 'status-playing'
+    case 'FINISHED':
+      return 'status-finished'
+    default:
+      return ''
+  }
+}
+
+// 获取房间状态文本
+function getRoomStatusText(room) {
+  switch (room.status) {
+    case 'WAITING':
+      return '等待中'
+    case 'PLAYING':
+      return '游戏中'
+    case 'FINISHED':
+      return '已结束'
+    default:
+      return '未知'
+  }
+}
+
+// 获取无法加入的原因
+function getJoinDisabledReason(room) {
+  if (room.status === 'PLAYING') {
+    return '游戏进行中'
+  }
+  if (room.status === 'FINISHED') {
+    return '游戏已结束'
+  }
+  if (room.current_players >= room.max_players) {
+    return '房间已满'
+  }
+  return '无法加入'
 }
 
 function goProfile() {
@@ -310,16 +477,20 @@ function roomCanJoin(room) {
 }
 
 async function handleJoinRoom(room) {
-  if (!roomCanJoin(room)) return
+  if (!canJoinRoom(room)) return
 
   loading.value = true
   try {
     await roomAPI.join(room.id)
+    showToast('加入房间成功', 'success')
+    // 停止轮询
+    stopRoomPolling()
+    // 跳转到房间页面
     uni.navigateTo({
       url: `/pages/game-room/game-room?id=${room.id}`
     })
   } catch (e) {
-    showToast(e.response?.data?.msg || '加入失败')
+    showToast(e.response?.data?.msg || '加入房间失败', 'error')
   } finally {
     loading.value = false
   }
@@ -819,5 +990,282 @@ async function handleJoinRoom(room) {
 .rule-highlight {
   color: #e94560;
   font-weight: 700;
+}
+
+/* 房间列表遮罩层 */
+.room-list-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fade-in 0.3s ease-out;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* 房间列表弹窗 */
+.room-list-modal {
+  width: 90vw;
+  max-width: 900px;
+  height: 80vh;
+  max-height: 500px;
+  background: linear-gradient(160deg, #1f1610 0%, #2a1c12 100%);
+  border: 3px solid #5a3a1e;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(212, 165, 116, 0.2);
+  animation: modal-appear 0.3s ease-out;
+}
+
+@keyframes modal-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* 房间列表头部 */
+.room-list-header {
+  padding: 8px 20px;
+  border-bottom: 2px solid #3a2616;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.room-list-title {
+  color: #d4a574;
+  font-size: 18px;
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.room-list-close {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8a6a4a;
+  font-size: 32px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.room-list-close:active {
+  color: #d4a574;
+  transform: scale(0.95);
+}
+
+/* 房间列表内容区 */
+.room-list-content {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+/* 空状态 */
+.room-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 12px;
+}
+
+.empty-icon {
+  font-size: 48px;
+  opacity: 0.6;
+}
+
+.empty-text {
+  color: #a08060;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.empty-hint {
+  color: #8a6a4a;
+  font-size: 14px;
+}
+
+/* 房间网格 - 两列布局 */
+.room-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+/* 房间卡片 */
+.room-item {
+  background: linear-gradient(140deg, rgba(35, 8, 8, 0.85) 0%, rgba(28, 6, 6, 0.9) 100%);
+  border: 2px solid #5a3a1e;
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(212, 165, 116, 0.1);
+  transition: all 0.2s;
+  cursor: pointer;
+  max-height: 120px;
+}
+
+.room-item:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.room-item.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* 房间卡片头部 */
+.room-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.room-name {
+  color: #d4a574;
+  font-size: 16px;
+  font-weight: 600;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-status-badge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.room-status-badge.status-waiting {
+  background: rgba(74, 222, 128, 0.2);
+  color: #4ade80;
+  border: 1px solid #4ade80;
+}
+
+.room-status-badge.status-playing {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+  border: 1px solid #fbbf24;
+}
+
+.room-status-badge.status-finished {
+  background: rgba(156, 163, 175, 0.2);
+  color: #9ca3af;
+  border: 1px solid #6b7280;
+}
+
+/* 房间卡片主体 */
+.room-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.room-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.room-info-label {
+  color: #a08060;
+  font-size: 13px;
+}
+
+.room-info-value {
+  color: #d4a574;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* 房间卡片底部 */
+.room-item-footer {
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid rgba(90, 58, 30, 0.5);
+}
+
+.join-hint {
+  display: block;
+  color: #4ade80;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.join-disabled {
+  display: block;
+  color: #9ca3af;
+  font-size: 12px;
+  text-align: center;
+}
+
+/* 房间列表底部 */
+.room-list-footer {
+  padding: 6px 16px;
+  border-top: 2px solid #3a2616;
+}
+
+.room-list-create-btn {
+  width: 100%;
+  height: 44px;
+  background: linear-gradient(135deg, #7a3e3e 0%, #5c2e2e 100%);
+  border: 2px solid #8a4e4e;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 0 20px rgba(122, 62, 62, 0.3);
+  transition: all 0.2s;
+}
+
+.room-list-create-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.create-btn-icon {
+  color: #d4a574;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.create-btn-text {
+  color: #d4a574;
+  font-size: 16px;
+  font-weight: 600;
 }
 </style>

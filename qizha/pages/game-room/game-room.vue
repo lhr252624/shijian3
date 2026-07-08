@@ -184,40 +184,23 @@
           </view>
 
           <!-- 出牌按钮 - 仅当legal_actions包含PLAY_CARD -->
-          <button
-            v-if="canPlayCard"
-            class="action-btn play-btn"
-            :disabled="selectedCards.length === 0"
-            @tap="playCards"
-          >
+          <button v-if="canPlayCard" class="action-btn play-btn" :disabled="selectedCards.length === 0"
+            @tap="playCards">
             出牌 ({{ selectedCards.length }})
           </button>
 
           <!-- 质疑按钮 - 仅当legal_actions包含CHALLENGE -->
-          <button
-            v-if="canChallenge"
-            class="action-btn challenge-btn"
-            @tap="challenge"
-          >
+          <button v-if="canChallenge" class="action-btn challenge-btn" @tap="challenge">
             质疑
           </button>
 
           <!-- 放弃按钮 - 仅当legal_actions包含PASS -->
-          <button
-            v-if="canPass"
-            class="action-btn pass-btn"
-            @tap="passTurn"
-          >
+          <button v-if="canPass" class="action-btn pass-btn" @tap="passTurn">
             {{ gameState?.phase === 'CHALLENGE' ? '放弃质疑' : '跳过' }}
           </button>
 
           <!-- Foxy主动技能按钮 - 独立于legal_actions -->
-          <button
-            v-if="canUseSkill"
-            class="action-btn skill-btn"
-            :disabled="skillUsed"
-            @tap="showSkillTargetSelect"
-          >
+          <button v-if="canUseSkill" class="action-btn skill-btn" :disabled="skillUsed" @tap="showSkillTargetSelect">
             {{ skillUsed ? '技能已使用' : '🔍 偷看手牌' }}
           </button>
 
@@ -239,13 +222,8 @@
       <view class="skill-modal">
         <text class="skill-modal-title">选择偷看目标</text>
         <view class="skill-targets">
-          <view
-            v-for="player in opponents"
-            :key="player.id"
-            class="skill-target"
-            :class="{ disabled: !player.is_alive }"
-            @tap="useSkillOnTarget(player.id)"
-          >
+          <view v-for="player in opponents" :key="player.id" class="skill-target"
+            :class="{ disabled: !player.is_alive }" @tap="useSkillOnTarget(player.id)">
             <view class="target-avatar">{{ player.is_ai ? '🤖' : '👤' }}</view>
             <text class="target-name">{{ player.nickname }}</text>
             <text class="target-cards">{{ player.hand_count }} 张牌</text>
@@ -272,22 +250,12 @@
     <Toast v-model:visible="toast.show" :message="toast.msg" :type="toast.type" />
 
     <!-- 自定义确认对话框 -->
-    <ConfirmDialog
-      v-model:visible="confirmDialog.visible"
-      :title="confirmDialog.title"
-      :content="confirmDialog.content"
-      @confirm="confirmDialog.onConfirm"
-      @cancel="confirmDialog.onCancel"
-    />
+    <ConfirmDialog v-model:visible="confirmDialog.visible" :title="confirmDialog.title" :content="confirmDialog.content"
+      @confirm="confirmDialog.onConfirm" @cancel="confirmDialog.onCancel" />
 
     <!-- 自定义输入对话框 -->
-    <InputDialog
-      v-model:visible="inputDialog.visible"
-      :title="inputDialog.title"
-      :placeholder="inputDialog.placeholder"
-      @confirm="inputDialog.onConfirm"
-      @cancel="inputDialog.onCancel"
-    />
+    <InputDialog v-model:visible="inputDialog.visible" :title="inputDialog.title" :placeholder="inputDialog.placeholder"
+      @confirm="inputDialog.onConfirm" @cancel="inputDialog.onCancel" />
   </view>
 </template>
 
@@ -336,16 +304,16 @@ const confirmDialog = ref({
   visible: false,
   title: '提示',
   content: '',
-  onConfirm: () => {},
-  onCancel: () => {}
+  onConfirm: () => { },
+  onCancel: () => { }
 })
 
 const inputDialog = ref({
   visible: false,
   title: '请输入',
   placeholder: '',
-  onConfirm: (value) => {},
-  onCancel: () => {}
+  onConfirm: (value) => { },
+  onCancel: () => { }
 })
 
 let challengeFxTimer = null
@@ -1229,6 +1197,7 @@ function onChat(payload) {
     opacity: 0;
     transform: translateX(10px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
@@ -2242,6 +2211,7 @@ function onChat(payload) {
     opacity: 0;
     transform: scale(0.9);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
@@ -2287,5 +2257,4 @@ function onChat(payload) {
   font-size: 16px;
   font-weight: 600;
 }
-
 </style>

@@ -105,10 +105,11 @@ export const userAPI = {
 
 // 匹配相关API
 export const matchAPI = {
-  start: () =>
+  start: (data) =>
     request({
       url: "/match/start",
       method: "POST",
+      data,
     }),
 
   cancel: () =>
