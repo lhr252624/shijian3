@@ -76,6 +76,10 @@
     <Toast :visible="toast.show" :message="toast.msg" :type="toast.type" @update:visible="toast.show = false" />
     <Loading v-if="loading" />
 
+    <!-- 退出登录确认对话框 -->
+    <ConfirmDialog v-model:visible="logoutDialog.show" :title="logoutDialog.title" :content="logoutDialog.content"
+      @confirm="confirmLogout" />
+
     <!-- 创建房间输入对话框 -->
     <InputDialog v-model:visible="createRoomDialog.show" :title="createRoomDialog.title"
       :placeholder="createRoomDialog.placeholder" @confirm="handleCreateRoom" />
@@ -204,6 +208,7 @@ import Toast from '../../components/Toast.vue'
 import Loading from '../../components/Loading.vue'
 import RulesModal from '../../components/RulesModal.vue'
 import InputDialog from '../../components/InputDialog.vue'
+import ConfirmDialog from '../../components/ConfirmDialog.vue'
 
 const authStore = useAuthStore()
 
@@ -218,6 +223,12 @@ const createRoomDialog = ref({
   show: false,
   title: '创建房间',
   placeholder: '请输入房间名称'
+})
+
+const logoutDialog = ref({
+  show: false,
+  title: '退出登录',
+  content: '确定要退出吗？'
 })
 
 let pollTimer = null
@@ -444,17 +455,13 @@ function goSettings() {
 }
 
 function handleLogout() {
-  uni.showModal({
-    title: '退出登录',
-    content: '确定要退出吗？',
-    success: (res) => {
-      if (res.confirm) {
-        authStore.logout()
-        uni.reLaunch({
-          url: '/pages/login/login'
-        })
-      }
-    }
+  logoutDialog.value.show = true
+}
+
+function confirmLogout() {
+  authStore.logout()
+  uni.reLaunch({
+    url: '/pages/login/login'
   })
 }
 

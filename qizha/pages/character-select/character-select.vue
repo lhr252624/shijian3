@@ -28,23 +28,15 @@
     </view>
 
     <!-- 右侧角色卡片区 -->
-    <view class="characters-container">
+    <view class="characters-container" :key="forceRenderKey">
       <view v-for="(char, index) in characters" :key="char.id" class="character-card-wrapper"
         :class="{ selected: selectedCharacter === char.id }" @tap="selectCharacter(char.id)">
         <!-- 三层边框容器 -->
         <view class="card-border-base">
-          <!-- 外层底部棱角 -->
-          <view class="corner-bottom-left"></view>
-          <view class="corner-bottom-right"></view>
-
           <!-- 旋转边框层 -->
-          <view class="card-border-rotating"></view>
+          <view class="card-border-rotating" :class="{ 'animation-enabled': enableAnimations }"></view>
           <!-- 内层容器 -->
           <view class="card-border-inner">
-            <!-- 内层底部棱角 -->
-            <view class="inner-corner-bottom-left"></view>
-            <view class="inner-corner-bottom-right"></view>
-
             <view class="character-card">
               <!-- 角色图片 -->
               <view class="character-avatar">
@@ -77,12 +69,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onActivated } from 'vue'
+import { ref, onMounted, onActivated, nextTick } from 'vue'
 import { matchAPI } from '../../utils/api'
 import Loading from '../../components/Loading.vue'
 
 const selectedCharacter = ref('')
 const loading = ref(false)
+const forceRenderKey = ref(0)
+const enableAnimations = ref(false)
 
 // 角色数据
 const characters = ref([
@@ -97,7 +91,7 @@ const characters = ref([
     id: 'foxy',
     name: 'Foxy',
     description: '可以偷看其他玩家手牌',
-    skill: '每局游戏可使用一次偷看技能，查看目标玩家的所有手牌3秒',
+    skill: '每个轮次可使用一次，在自己的出牌回合查看目标的所有手牌3秒',
     image: '../../static/tavern_characters_v01/assets/art/characters/foxy/foxy_idle_tavern_v01.png'
   },
   {
@@ -126,10 +120,45 @@ function setLandscape() {
 
 onMounted(() => {
   setLandscape()
+  // 多次延迟强制重绘，确保渲染稳定
+  nextTick(() => {
+    setTimeout(() => {
+      forceRenderKey.value++
+      console.log('第一次强制重绘')
+    }, 50)
+
+    setTimeout(() => {
+      forceRenderKey.value++
+      console.log('第二次强制重绘')
+    }, 150)
+
+    setTimeout(() => {
+      forceRenderKey.value++
+      console.log('第三次强制重绘')
+    }, 300)
+
+    // 延迟启用动画，确保所有内容已经渲染完成
+    setTimeout(() => {
+      enableAnimations.value = true
+      console.log('启用旋转动画')
+    }, 500)
+  })
 })
 
 onActivated(() => {
   setLandscape()
+  // 页面激活时也强制重绘
+  nextTick(() => {
+    setTimeout(() => {
+      forceRenderKey.value++
+      console.log('页面激活，强制重绘')
+    }, 50)
+
+    setTimeout(() => {
+      forceRenderKey.value++
+      console.log('页面激活，第二次重绘')
+    }, 150)
+  })
 })
 
 function selectCharacter(charId) {
@@ -399,11 +428,11 @@ function goBack() {
 }
 
 .character-card-wrapper:hover {
-  transform: translateY(-8px) translateZ(0);
+  transform: translateY(-8px);
 }
 
 .character-card-wrapper.selected {
-  transform: translateY(-12px) scale(1.02) translateZ(0);
+  transform: translateY(-12px) scale(1.02);
 }
 
 /* 第一层：底层容器（外边框） */
@@ -420,54 +449,21 @@ function goBack() {
   border: 2px solid transparent;
   background-clip: padding-box;
   isolation: isolate;
+  /* 使用 clip-path 创建棱角效果 */
+  clip-path: polygon(
+    15px 0%, calc(100% - 15px) 0%,
+    100% 15px, 100% calc(100% - 15px),
+    calc(100% - 15px) 100%, 15px 100%,
+    0% calc(100% - 15px), 0% 15px
+  );
 }
 
-/* 外层容器的四个角棱角切割 */
-.card-border-base::before {
-  content: '';
-  position: absolute;
-  width: 20px;
-  height: 20px;
-  background: #1a0f0a;
-  top: -2px;
-  left: -2px;
-  clip-path: polygon(0 0, 100% 0, 0 100%);
-  z-index: 100;
-}
-
-.card-border-base::after {
-  content: '';
-  position: absolute;
-  width: 20px;
-  height: 20px;
-  background: #1a0f0a;
-  top: -2px;
-  right: -2px;
-  clip-path: polygon(100% 0, 100% 100%, 0 0);
-  z-index: 100;
-}
-
-/* 外层容器底部棱角 */
-.corner-bottom-left {
-  position: absolute;
-  width: 20px;
-  height: 20px;
-  background: #1a0f0a;
-  bottom: -2px;
-  left: -2px;
-  clip-path: polygon(0 100%, 100% 100%, 0 0);
-  z-index: 100;
-}
-
-.corner-bottom-right {
-  position: absolute;
-  width: 20px;
-  height: 20px;
-  background: #1a0f0a;
-  bottom: -2px;
-  right: -2px;
-  clip-path: polygon(100% 100%, 100% 0, 0 100%);
-  z-index: 100;
+.character-card-wrapper.selected .card-border-base {
+  background: linear-gradient(135deg, #3a2616 0%, #2a1812 100%);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.8),
+    0 0 40px rgba(212, 165, 116, 0.3),
+    inset 0 2px 4px rgba(0, 0, 0, 0.6);
 }
 
 .character-card-wrapper.selected .card-border-base {
@@ -499,9 +495,17 @@ function goBack() {
       rgba(138, 78, 78, 0.9) 55%,
       transparent 60%,
       transparent 100%);
-  animation: rotateInPlace 6s linear infinite;
+  animation: none;
   z-index: 0;
   pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+/* 启用动画后才显示并旋转 */
+.card-border-rotating.animation-enabled {
+  animation: rotateInPlace 6s linear infinite;
+  opacity: 1;
 }
 
 /* 禁用前两个卡片的动画，避免渲染问题 */
@@ -548,54 +552,20 @@ function goBack() {
   background: linear-gradient(135deg, #5a3a1e 0%, #3a2616 100%);
   box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.8);
   z-index: 10;
+  /* 使用 clip-path 创建棱角效果 */
+  clip-path: polygon(
+    12px 0%, calc(100% - 12px) 0%,
+    100% 12px, 100% calc(100% - 12px),
+    calc(100% - 12px) 100%, 12px 100%,
+    0% calc(100% - 12px), 0% 12px
+  );
 }
 
-/* 内层容器的四个角棱角 - 使用额外的view来实现 */
-.card-border-inner::before {
-  content: '';
-  position: absolute;
-  width: 16px;
-  height: 16px;
-  background: linear-gradient(135deg, #1f1610 0%, #2a1c12 100%);
-  top: -1px;
-  left: -1px;
-  clip-path: polygon(0 0, 100% 0, 0 100%);
-  z-index: 101;
-}
-
-.card-border-inner::after {
-  content: '';
-  position: absolute;
-  width: 16px;
-  height: 16px;
-  background: linear-gradient(135deg, #1f1610 0%, #2a1c12 100%);
-  top: -1px;
-  right: -1px;
-  clip-path: polygon(100% 0, 100% 100%, 0 0);
-  z-index: 101;
-}
-
-/* 内层容器底部棱角 */
-.inner-corner-bottom-left {
-  position: absolute;
-  width: 16px;
-  height: 16px;
-  background: linear-gradient(135deg, #1f1610 0%, #2a1c12 100%);
-  bottom: -1px;
-  left: -1px;
-  clip-path: polygon(0 100%, 100% 100%, 0 0);
-  z-index: 101;
-}
-
-.inner-corner-bottom-right {
-  position: absolute;
-  width: 16px;
-  height: 16px;
-  background: linear-gradient(135deg, #1f1610 0%, #2a1c12 100%);
-  bottom: -1px;
-  right: -1px;
-  clip-path: polygon(100% 100%, 100% 0, 0 100%);
-  z-index: 101;
+.character-card-wrapper.selected .card-border-inner {
+  background: linear-gradient(135deg, #d4a574 0%, #8a4e4e 100%);
+  box-shadow:
+    inset 0 0 8px rgba(0, 0, 0, 0.8),
+    0 0 12px rgba(212, 165, 116, 0.6);
 }
 
 .character-card-wrapper.selected .card-border-inner {
@@ -655,17 +625,18 @@ function goBack() {
   font-weight: 700;
   color: #d4a574;
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
-  margin-bottom: 4px;
+  margin-bottom: 1px;
 }
 
 .character-desc {
+  padding: 0;
   font-size: 13px;
   color: #c0b0a0;
-  line-height: 1.4;
+  // line-height: 1.4;
 }
 
 .skill-section {
-  margin-top: auto;
+  // margin-top: auto;
   padding-top: 8px;
   border-top: 1px solid rgba(90, 58, 30, 0.3);
 }

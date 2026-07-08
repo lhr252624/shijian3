@@ -6,69 +6,82 @@
       <view style="width: 100rpx;"></view>
     </view>
 
-    <scroll-view v-if="profile" class="profile-content" scroll-y>
-      <view class="avatar-section">
-        <view class="avatar">{{ profile.nickname?.charAt(0) || '?' }}</view>
-        <text class="nickname">{{ profile.nickname }}</text>
-        <text class="username">@{{ profile.username }}</text>
+    <view v-if="profile" class="profile-content">
+      <!-- 上半部分：左右布局 -->
+      <view class="top-section">
+        <!-- 左侧：头像和基本信息 -->
+        <view class="left-panel">
+          <!-- 头像和昵称行 -->
+          <view class="user-header">
+            <view class="avatar">{{ profile.nickname?.charAt(0) || '?' }}</view>
+            <view class="user-info">
+              <text class="nickname">{{ profile.nickname }}</text>
+              <text class="username">@{{ profile.username }}</text>
+            </view>
+          </view>
+
+          <!-- 关键数据横向排列 -->
+          <view class="key-stats">
+            <view class="key-stat-item">
+              <text class="key-stat-label">ELO</text>
+              <text class="key-stat-value">{{ profile.elo_rating }}</text>
+            </view>
+            <view class="key-stat-item">
+              <text class="key-stat-label">胜率</text>
+              <text class="key-stat-value">{{ winRate }}%</text>
+            </view>
+            <view class="key-stat-item">
+              <text class="key-stat-label">总局</text>
+              <text class="key-stat-value">{{ profile.total_games }}</text>
+            </view>
+            <view class="key-stat-item">
+              <text class="key-stat-label">胜场</text>
+              <text class="key-stat-value">{{ profile.total_wins }}</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 右侧：详细数据 -->
+        <view class="right-panel">
+          <text class="panel-title">详细数据</text>
+          <view class="data-row">
+            <text class="data-label">总游戏</text>
+            <text class="data-value">{{ profile.total_games }}</text>
+          </view>
+          <view class="data-row">
+            <text class="data-label">胜利</text>
+            <text class="data-value">{{ profile.total_wins }}</text>
+          </view>
+          <view class="data-row">
+            <text class="data-label">失败</text>
+            <text class="data-value">{{ profile.total_losses }}</text>
+          </view>
+          <view class="data-row">
+            <text class="data-label">撒谎次数</text>
+            <text class="data-value">{{ profile.total_lies }}</text>
+          </view>
+          <view class="data-row">
+            <text class="data-label">质疑次数</text>
+            <text class="data-value">{{ profile.total_challenges }}</text>
+          </view>
+          <view class="data-row">
+            <text class="data-label">质疑成功</text>
+            <text class="data-value">{{ profile.total_successful_challenges }}</text>
+          </view>
+        </view>
       </view>
 
-      <view class="stats-grid">
-        <view class="stat-item">
-          <text class="stat-num">{{ profile.elo_rating }}</text>
-          <text class="stat-lbl">ELO 评分</text>
-        </view>
-        <view class="stat-item">
-          <text class="stat-num">{{ profile.total_games }}</text>
-          <text class="stat-lbl">总局数</text>
-        </view>
-        <view class="stat-item">
-          <text class="stat-num">{{ winRate }}%</text>
-          <text class="stat-lbl">胜率</text>
-        </view>
-        <view class="stat-item">
-          <text class="stat-num">{{ profile.total_wins }}</text>
-          <text class="stat-lbl">胜场</text>
-        </view>
-      </view>
-
-      <view class="detail-stats">
-        <text class="section-title">详细数据</text>
-        <view class="detail-row">
-          <text class="detail-label">总游戏</text>
-          <text class="detail-value">{{ profile.total_games }}</text>
-        </view>
-        <view class="detail-row">
-          <text class="detail-label">胜利</text>
-          <text class="detail-value">{{ profile.total_wins }}</text>
-        </view>
-        <view class="detail-row">
-          <text class="detail-label">失败</text>
-          <text class="detail-value">{{ profile.total_losses }}</text>
-        </view>
-        <view class="detail-row">
-          <text class="detail-label">撒谎次数</text>
-          <text class="detail-value">{{ profile.total_lies }}</text>
-        </view>
-        <view class="detail-row">
-          <text class="detail-label">质疑次数</text>
-          <text class="detail-value">{{ profile.total_challenges }}</text>
-        </view>
-        <view class="detail-row">
-          <text class="detail-label">质疑成功</text>
-          <text class="detail-value">{{ profile.total_successful_challenges }}</text>
-        </view>
-      </view>
-
+      <!-- 底部：修改资料 -->
       <view class="edit-section">
         <text class="section-title">修改资料</text>
-        <input v-model="editNickname" class="edit-input" placeholder="新昵称" placeholder-class="input-placeholder" />
-        <button class="save-btn" :disabled="!editNickname || editNickname === profile.nickname" @tap="updateProfile">
-          保存
-        </button>
-        <text v-if="updateMsg" class="update-msg">{{ updateMsg }}</text>
+        <view class="edit-form">
+          <input v-model="editNickname" class="edit-input" placeholder="新昵称" placeholder-class="input-placeholder" />
+          <button class="save-btn" :disabled="!editNickname || editNickname === profile.nickname" @tap="updateProfile">
+            保存修改
+          </button>
+        </view>
       </view>
-    </scroll-view>
+    </view>
 
     <Toast v-model:visible="toast.show" :message="toast.msg" :type="toast.type" />
   </view>
@@ -123,18 +136,22 @@ function goBack() {
 
 <style scoped>
 .profile-page {
-  min-height: 100vh;
+  width: 100vw;
+  height: 100vh;
   background: linear-gradient(145deg, #1a0f0a 0%, #2a1812 50%, #1f1208 100%);
+  display: flex;
+  flex-direction: column;
 }
 
 .page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  /* padding: 12px 10px; */
+  height: 48px;
   background: rgba(30, 10, 10, 0.85);
   border-bottom: 2px solid #5c2e2e;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  flex-shrink: 0;
 }
 
 .back-btn {
@@ -142,13 +159,11 @@ function goBack() {
   padding: 12px 20px;
   background: none;
   color: #a08060;
-  /* padding: 0; */
   font-size: 14px;
   border: none;
 }
 
 .page-title {
-  /* background-color: #4ade80; */
   transform: translateX(30%);
   color: #d4a574;
   font-size: 18px;
@@ -157,20 +172,47 @@ function goBack() {
 }
 
 .profile-content {
-  height: calc(100vh - 48px);
+  flex: 1;
   padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: hidden;
 }
 
-.avatar-section {
-  text-align: center;
-  margin-bottom: 24px;
+/* 上半部分：左右布局 */
+.top-section {
+  flex: 1;
+  display: flex;
+  gap: 16px;
+  min-height: 0;
+}
+
+/* 左侧面板 */
+.left-panel {
+  flex: 1;
+  background: linear-gradient(160deg, rgba(30, 10, 10, 0.8) 0%, rgba(42, 24, 18, 0.8) 100%);
+  border: 2px solid #5c2e2e;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 2px rgba(212, 165, 116, 0.1);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* 头像和昵称行 */
+.user-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
 .avatar {
-  width: 70px;
-  height: 70px;
+  width: 60px;
+  height: 60px;
   background: linear-gradient(145deg, #8a4a4a 0%, #5c2e2e 100%);
-  border: 2px solid #5a3a1e;
+  border: 3px solid #5a3a1e;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -178,63 +220,117 @@ function goBack() {
   font-size: 28px;
   font-weight: 700;
   color: #d4a574;
-  margin: 0 auto 12px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .nickname {
-  display: block;
   color: #d4a574;
   font-size: 20px;
   font-weight: 700;
-  margin-bottom: 4px;
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
 }
 
 .username {
-  display: block;
   color: #8a6a4a;
   font-size: 13px;
 }
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+/* 关键数据横向排列 */
+.key-stats {
+  display: flex;
   gap: 8px;
-  margin-bottom: 24px;
+  justify-content: space-between;
+  margin: 10px;
+  padding: 2px 4px;
 }
 
-.stat-item {
-  background: rgba(30, 10, 10, 0.6);
-  border: 1px solid #5c2e2e;
+.key-stat-item {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid #5a3a1e;
   border-radius: 8px;
-  padding: 12px 8px;
-  text-align: center;
+  padding: 8px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+  min-width: 0;
 }
 
-.stat-num {
-  display: block;
+.key-stat-label {
+  color: #a08060;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.key-stat-value {
   color: #d4a574;
-  font-size: 22px;
+  font-size: 16px;
   font-weight: 700;
 }
 
-.stat-lbl {
-  display: block;
-  color: #8a6a4a;
-  font-size: 11px;
-  margin-top: 4px;
+/* 右侧面板 */
+.right-panel {
+  flex: 1;
+  background: linear-gradient(160deg, rgba(30, 10, 10, 0.8) 0%, rgba(42, 24, 18, 0.8) 100%);
+  border: 2px solid #5c2e2e;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 2px rgba(212, 165, 116, 0.1);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
 }
 
-.detail-stats,
-.edit-section {
-  background: rgba(30, 10, 10, 0.7);
-  border: 2px solid #5c2e2e;
-  border-radius: 8px;
-  padding: 16px;
+.panel-title {
+  color: #d4a574;
+  font-size: 16px;
+  font-weight: 700;
   margin-bottom: 16px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4), inset 0 1px 2px rgba(139, 69, 19, 0.2);
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+  flex-shrink: 0;
+}
+
+.data-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 30px;
+  padding: 0 12px;
+  border-bottom: 1px solid rgba(90, 58, 30, 0.3);
+}
+
+.data-row:last-child {
+  border-bottom: none;
+}
+
+.data-label {
+  color: #a08060;
+  font-size: 14px;
+}
+
+.data-value {
+  color: #d4a574;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* 底部修改资料区 */
+.edit-section {
+  flex-shrink: 0;
+  background: linear-gradient(160deg, rgba(30, 10, 10, 0.8) 0%, rgba(42, 24, 18, 0.8) 100%);
+  border: 2px solid #5c2e2e;
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 2px rgba(212, 165, 116, 0.1);
 }
 
 .section-title {
@@ -246,66 +342,60 @@ function goBack() {
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
 }
 
-.detail-row {
+.edit-form {
   display: flex;
-  justify-content: space-between;
-  padding: 8px 0;
-  border-bottom: 1px solid #3a2616;
-}
-
-.detail-row:last-child {
-  border-bottom: none;
-}
-
-.detail-label {
-  color: #a08060;
-  font-size: 14px;
-}
-
-.detail-value {
-  color: #d4a574;
-  font-size: 14px;
-  font-weight: 600;
+  gap: 12px;
+  align-items: center;
 }
 
 .edit-input {
-  width: 100%;
-  padding: 10px 12px;
-  background: rgba(13, 8, 5, 0.8);
-  border: 1px solid #5a3a1e;
+  flex: 1;
+  height: 36px;
+  padding: 0 12px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 2px solid #5a3a1e;
   border-radius: 6px;
-  color: #d6c0a9;
+  color: #d4a574;
   font-size: 14px;
-  margin-bottom: 12px;
-  box-sizing: border-box;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
 }
 
 .input-placeholder {
-  color: #5a4434;
+  color: rgba(160, 128, 96, 0.5);
+}
+
+.edit-input:focus {
+  border-color: #8a4e4e;
+  background: rgba(0, 0, 0, 0.65);
 }
 
 .save-btn {
-  width: 100%;
-  background: linear-gradient(145deg, #8a4a4a 0%, #5c2e2e 100%);
+  flex-shrink: 0;
+  width: 120px;
+  height: 36px;
+  background: linear-gradient(135deg, #7a3e3e 0%, #5c2e2e 100%);
+  border: 2px solid #8a4e4e;
+  border-radius: 6px;
   color: #d4a574;
-  padding: 12px;
   font-size: 14px;
   font-weight: 600;
-  border-radius: 6px;
-  border: 1px solid #5a3a1e;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+}
+
+.save-btn:active {
+  transform: translateY(2px);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
 .save-btn[disabled] {
   opacity: 0.5;
-}
-
-.update-msg {
-  display: block;
-  color: #4ade80;
-  margin-top: 8px;
-  font-size: 13px;
-  text-align: center;
+  background: linear-gradient(135deg, #3a2616 0%, #2a1812 100%);
+  border-color: #5a3a1e;
+  color: #5a3a1e;
 }
 </style>

@@ -65,6 +65,9 @@
 		"navigationBarTextStyle": "white",
 		"navigationBarTitleText": "Liar's Bar",
 		"navigationBarBackgroundColor": "#1a1a2e",
-		"backgroundColor": "#1a1a2e"
+		"backgroundColor": "#1a1a2e",
+		"disableScroll": true,
+		"enablePullDownRefresh": false,
+		"bounce": "none"
 	}
 }

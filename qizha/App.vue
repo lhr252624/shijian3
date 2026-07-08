@@ -7,6 +7,21 @@ onLaunch(() => {
   // #ifdef APP-PLUS
   // 锁定为横屏模式
   plus.screen.lockOrientation('landscape-primary')
+
+  // 隐藏状态栏和导航栏，实现真正的全屏
+  plus.navigator.setFullscreen(true)
+
+  // 隐藏系统导航栏（虚拟按键）
+  plus.navigator.hideSystemNavigation()
+
+  // 设置沉浸式模式
+  plus.navigator.setStatusBarStyle('dark')
+  // #endif
+
+  // #ifdef H5
+  // H5端尝试全屏
+  document.documentElement.style.height = '100%'
+  document.body.style.height = '100%'
   // #endif
 })
 

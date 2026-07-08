@@ -151,7 +151,8 @@
             <!-- 操作按钮组 -->
             <view class="action-buttons-top">
               <!-- 出牌按钮 - 放在最前面 -->
-              <button v-if="canPlayCard" class="top-btn play-btn" :disabled="selectedCards.length === 0" @tap="playCards">
+              <button v-if="canPlayCard" class="top-btn play-btn" :disabled="selectedCards.length === 0"
+                @tap="playCards">
                 出牌({{ selectedCards.length }})
               </button>
 
@@ -183,7 +184,8 @@
           <!-- 第二行：技能按钮（侧边栏）+ 手牌 -->
           <view class="cards-row">
             <!-- Foxy技能按钮 -->
-            <button v-if="showSkillButton" class="skill-btn-sidebar" :disabled="!canUseSkill" @tap="showSkillTargetSelect">
+            <button v-if="showSkillButton" class="skill-btn-sidebar" :disabled="!canUseSkill"
+              @tap="showSkillTargetSelect">
               <view class="skill-icon">🔍</view>
               <text class="skill-label">{{ skillUsed ? '已用' : '偷看' }}</text>
             </button>
@@ -201,13 +203,46 @@
           </view>
         </view>
 
-        <!-- 行动日志面板 -->
+        <!-- 行动日志/聊天面板 -->
         <view class="action-log-panel">
-          <view class="log-header">
-            <text class="log-title">📋 行动日志</text>
-            <button class="log-clear-btn" @tap="clearActionLog">清空</button>
+          <!-- 切换栏 -->
+          <view class="panel-tabs">
+            <view class="tab-item" :class="{ active: currentTab === 'chat' }" @tap="currentTab = 'chat'">
+              <text class="tab-text">💬 聊天</text>
+            </view>
+            <view class="tab-item" :class="{ active: currentTab === 'log' }" @tap="currentTab = 'log'">
+              <text class="tab-text">📋 日志</text>
+            </view>
           </view>
-          <scroll-view class="log-content" scroll-y="true" :scroll-top="logScrollTop">
+
+          <!-- 聊天标签页 -->
+          <view v-if="currentTab === 'chat'" class="chat-tab">
+            <!-- 聊天消息列表 -->
+            <scroll-view class="chat-messages" scroll-y="true" :scroll-top="chatScrollTop">
+              <view v-for="(msg, index) in chatMessages" :key="index" class="chat-item">
+                <text class="chat-sender">{{ msg.sender }}</text>
+                <text class="chat-text">{{ msg.content }}</text>
+              </view>
+              <view v-if="chatMessages.length === 0" class="log-empty">暂无聊天消息</view>
+            </scroll-view>
+
+            <!-- 消息输入框 -->
+            <view class="chat-input-box">
+              <input
+                v-model="chatInput"
+                class="chat-input"
+                placeholder="输入消息..."
+                :maxlength="200"
+                @confirm="sendChatMessage"
+              />
+              <button class="chat-send-btn" @tap="sendChatMessage">
+                <text>发送</text>
+              </button>
+            </view>
+          </view>
+
+          <!-- 行动日志标签页 -->
+          <scroll-view v-if="currentTab === 'log'" class="log-content" scroll-y="true" :scroll-top="logScrollTop">
             <view v-for="(log, index) in actionLogs" :key="index" class="log-item" :class="log.type">
               <text class="log-time">{{ log.time }}</text>
               <text class="log-text">{{ log.message }}</text>
@@ -302,6 +337,11 @@ const skillPeekResult = ref(null)
 // 行动日志
 const actionLogs = ref([])
 const logScrollTop = ref(0)
+
+// 聊天切换栏
+const currentTab = ref('chat') // 默认显示聊天
+const chatScrollTop = ref(0)
+const chatInput = ref('') // 聊天输入框内容
 
 // 自定义对话框
 const confirmDialog = ref({
@@ -1112,26 +1152,54 @@ function onPlayerJoined(payload) {
 function onChat(payload) {
   console.log('CHAT:', payload)
   chatMessages.value.push({
-    sender_id: payload.sender_id,
-    sender_name: payload.sender_name || `玩家${payload.sender_id}`,
+    sender: payload.sender_name || `玩家${payload.sender_id}`,
     content: payload.content,
-    is_ai: payload.is_ai || false
+    isAi: payload.is_ai || false
   })
 
+  // 自动滚动到底部
   nextTick(() => {
-    // 滚动到底部（如果有聊天窗口）
+    chatScrollTop.value = chatScrollTop.value + 9999
   })
+}
+
+// 发送聊天消息
+function sendChatMessage() {
+  if (!chatInput.value.trim()) {
+    return
+  }
+
+  const message = chatInput.value.trim()
+
+  // 通过 WebSocket 发送聊天消息
+  wsClient.send({
+    type: 'CHAT',
+    payload: {
+      content: message
+    }
+  })
+
+  // 清空输入框
+  chatInput.value = ''
+
+  console.log('发送聊天消息:', message)
 }
 </script>
 
 <style scoped>
 /* 页面容器 */
 .game-room {
-  position: relative;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   width: 100vw;
   height: 100vh;
   overflow: hidden;
   background: #0a0604;
+  padding-bottom: constant(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* 行动日志面板 */
@@ -1147,29 +1215,37 @@ function onChat(payload) {
   min-height: 0;
 }
 
-.log-header {
-  padding: 12px 16px;
-  background: linear-gradient(135deg, #3a2616 0%, #2a1812 100%);
-  border-bottom: 1px solid #5a3a1e;
+/* 切换栏 */
+.panel-tabs {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  height: 20px;
+  background: linear-gradient(135deg, #2a1812 0%, #1a0f0a 100%);
+  border-bottom: 1px solid #5a3a1e;
 }
 
-.log-title {
-  color: #d4a574;
-  font-size: 16px;
+.tab-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-bottom: 2px solid transparent;
+}
+
+.tab-item.active {
+  background: rgba(212, 165, 116, 0.1);
+  border-bottom-color: #d4a574;
+}
+
+.tab-text {
+  font-size: 11px;
+  color: #a08060;
   font-weight: 600;
 }
 
-.log-clear-btn {
-  padding: 4px 12px;
-  background: rgba(60, 0, 0, 0.6);
-  border: 1px solid #5a3a1e;
-  border-radius: 4px;
-  color: #a08060;
-  font-size: 12px;
-  cursor: pointer;
+.tab-item.active .tab-text {
+  color: #d4a574;
 }
 
 .log-content {
@@ -1280,6 +1356,97 @@ function onChat(payload) {
   color: #6b5a4a;
   font-size: 13px;
   padding: 20px;
+}
+
+/* 聊天标签页布局 */
+.chat-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.chat-messages {
+  flex: 1;
+  padding: 10px;
+  overflow-y: auto;
+}
+
+/* 聊天消息样式 */
+.chat-item {
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  background: rgba(42, 24, 18, 0.4);
+  font-size: 13px;
+  line-height: 1.5;
+  animation: log-appear 0.3s ease-out;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chat-sender {
+  color: #d4a574;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.chat-text {
+  color: #c0b0a0;
+  font-size: 13px;
+}
+
+/* 聊天输入框 */
+.chat-input-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  background: linear-gradient(135deg, #2a1812 0%, #1a0f0a 100%);
+  border-top: 1px solid #5a3a1e;
+}
+
+.chat-input {
+  flex: 1;
+  height: 32px;
+  padding: 0 12px;
+  background: rgba(26, 15, 10, 0.6);
+  border: 1px solid #5a3a1e;
+  border-radius: 6px;
+  color: #c0b0a0;
+  font-size: 13px;
+}
+
+.chat-input::placeholder {
+  color: #6b5a4a;
+}
+
+.chat-send-btn {
+  height: 32px;
+  padding: 0 16px;
+  background: linear-gradient(135deg, #d4a574 0%, #c09060 100%);
+  border: none;
+  border-radius: 6px;
+  color: #1a0f0a;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chat-send-btn:active {
+  transform: translateY(1px);
+  opacity: 0.9;
+}
+
+.chat-send-btn text {
+  color: #1a0f0a;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .screen-shake {
@@ -1979,6 +2146,7 @@ function onChat(payload) {
   overflow-x: auto;
   padding-bottom: 2px;
   flex: 1;
+  justify-content: center;
 }
 
 /* 手牌 */
