@@ -228,13 +228,14 @@
 
               <!-- 质疑按钮 - 手牌为0时禁用，已质疑后也禁用 -->
               <button v-if="canChallenge" class="top-btn challenge-btn"
-                :disabled="myHandCards.length === 0 || hasChallenged"
+                :disabled="hasChallenged"
                 @tap="challenge">
                 {{ hasChallenged ? '已质疑' : '质疑' }}
               </button>
 
-              <!-- 跳过按钮 - 只在质疑阶段显示，且不能是刚出牌的玩家，手牌为0时不显示（自动跳过），已放弃后禁用 -->
-              <button v-if="canPass && gameState?.phase === 'CHALLENGE' && !isLastPlayByMe && myHandCards.length > 0"
+              <!-- 跳过按钮 - 只在质疑阶段显示，且不能是刚出牌的玩家，已放弃后禁用 -->
+              <!-- 当手牌为0且没有质疑权限时，不显示放弃按钮（会自动跳过） -->
+              <button v-if="canPass && gameState?.phase === 'CHALLENGE' && !isLastPlayByMe && !(myHandCards.length === 0 && !canChallenge)"
                 class="top-btn pass-btn"
                 :disabled="hasPassedChallenge"
                 @tap="passTurn">
@@ -245,7 +246,7 @@
               <text v-if="myPlayer && myPlayer.hand_count === 0 && gameState?.phase === 'PLAYING'" class="status-text">
                 手牌已空，自动跳过
               </text>
-              <text v-else-if="myPlayer && myPlayer.hand_count === 0 && gameState?.phase === 'CHALLENGE'" class="status-text">
+              <text v-else-if="myHandCards.length === 0 && gameState?.phase === 'CHALLENGE' && !canChallenge" class="status-text">
                 手牌已空，自动放弃质疑
               </text>
               <text v-else-if="gameState?.phase === 'CHALLENGE' && !hasAnyAction" class="status-text">
@@ -855,7 +856,7 @@ watch(
   () => ({
     currentPlayer: gameState.value?.current_player,
     mySeatIndex: myPlayer.value?.seat_index,
-    handCount: myPlayer.value?.hand_count || 0,
+    actualHandCount: myHandCards.value.length,
     phase: gameState.value?.phase,
     legalActions: gameState.value?.legal_actions || [],
     currentTurn: gameState.value?.current_turn || 0
@@ -864,7 +865,7 @@ watch(
     console.log('🔍 watch触发 - 游戏状态变化:', {
       currentPlayer: newVal.currentPlayer,
       mySeatIndex: newVal.mySeatIndex,
-      handCount: newVal.handCount,
+      actualHandCount: newVal.actualHandCount,
       phase: newVal.phase,
       legalActions: newVal.legalActions,
       currentTurn: newVal.currentTurn
@@ -877,13 +878,19 @@ watch(
     console.log('🔍 条件检查:', {
       isMyTurn,
       canPass,
-      '手牌为0': newVal.handCount === 0
+      '实际手牌为0': newVal.actualHandCount === 0
     })
 
     // 自动跳过逻辑：
-    // 只在PLAYING阶段：轮到自己且手牌为0时，自动跳过
-    // CHALLENGE阶段不自动跳过，允许玩家选择是否质疑
-    const shouldAutoPass = newVal.phase === 'PLAYING' && isMyTurn && newVal.handCount === 0
+    // 1. PLAYING阶段：轮到自己且实际手牌为0时，自动跳过
+    // 2. PLAYING阶段防御：轮到自己但legal_actions为空时，强制跳过（防止死锁）
+    // 3. CHALLENGE阶段：手牌为0且legal_actions中没有CHALLENGE时，自动跳过（不能质疑）
+    // 使用 myHandCards.length 而不是 hand_count，确保数据一致性
+    const canChallenge = newVal.legalActions.includes('CHALLENGE')
+    const shouldAutoPass =
+      (newVal.phase === 'PLAYING' && isMyTurn && newVal.actualHandCount === 0) ||
+      (newVal.phase === 'PLAYING' && isMyTurn && newVal.legalActions.length === 0) ||
+      (newVal.phase === 'CHALLENGE' && newVal.actualHandCount === 0 && !canChallenge)
 
     if (shouldAutoPass) {
       // 生成唯一key，避免同一回合重复触发
