@@ -23,7 +23,9 @@
 
     <!-- 顶部栏 -->
     <view class="top-bar safe-area-inset-top safe-area-inset-left safe-area-inset-right">
-      <button class="back-btn" @tap="leaveRoom">← 返回大厅</button>
+      <view class="back-btn" @tap="leaveRoom">
+        <text>← 返回大厅</text>
+      </view>
       <view class="room-info">
         <text class="round-badge">第 {{ gameState?.current_round || 1 }} 轮</text>
         <text class="turn-badge">回合 {{ gameState?.current_turn || 0 }}</text>
@@ -79,6 +81,15 @@
 
     <!-- 游戏区域 -->
     <view v-if="gameState && gameState.phase !== 'GAME_OVER'" class="game-area">
+      <!-- 当前回合提示 - 移到右上角 -->
+      <view class="current-turn-banner">
+        <text v-if="gameState?.phase === 'CHALLENGE'" class="turn-text challenge-phase">
+          ⚠️ 质疑阶段 - 可以质疑或放弃
+        </text>
+        <text v-else-if="canPlayCard" class="turn-text my-turn">👉 轮到你操作</text>
+        <text v-else class="turn-text waiting">{{ currentPlayerName }} 操作中...</text>
+      </view>
+
       <!-- 左侧对手 -->
       <view v-if="opponents[0]" class="left-opponent">
         <view class="player-card player-card-vertical"
@@ -89,7 +100,11 @@
             <text v-if="opponents[0].is_ai">🤖</text>
             <text v-else>👤</text>
           </view>
-          <text class="player-name">{{ opponents[0].nickname }}</text>
+          <view class="player-name-row">
+            <text class="player-name">{{ opponents[0].nickname }}</text>
+            <text v-if="opponents[0].character_id" class="character-badge">{{
+              getCharacterName(opponents[0].character_id) }}</text>
+          </view>
           <view class="player-hp">
             <view v-for="i in 6" :key="i" class="hp-dot"
               :class="{ filled: i <= (opponents[0].bullets || opponents[0].punishment_count || 0) }">
@@ -115,7 +130,11 @@
             <text v-if="opponents[1].is_ai">🤖</text>
             <text v-else>👤</text>
           </view>
-          <text class="player-name">{{ opponents[1].nickname }}</text>
+          <view class="player-name-row">
+            <text class="player-name">{{ opponents[1].nickname }}</text>
+            <text v-if="opponents[1].character_id" class="character-badge">{{
+              getCharacterName(opponents[1].character_id) }}</text>
+          </view>
           <view class="player-hp">
             <view v-for="i in 6" :key="i" class="hp-dot"
               :class="{ filled: i <= (opponents[1].bullets || opponents[1].punishment_count || 0) }">
@@ -141,7 +160,11 @@
             <text v-if="opponents[2].is_ai">🤖</text>
             <text v-else>👤</text>
           </view>
-          <text class="player-name">{{ opponents[2].nickname }}</text>
+          <view class="player-name-row">
+            <text class="player-name">{{ opponents[2].nickname }}</text>
+            <text v-if="opponents[2].character_id" class="character-badge">{{
+              getCharacterName(opponents[2].character_id) }}</text>
+          </view>
           <view class="player-hp">
             <view v-for="i in 6" :key="i" class="hp-dot"
               :class="{ filled: i <= (opponents[2].bullets || opponents[2].punishment_count || 0) }">
@@ -159,23 +182,13 @@
 
       <!-- 中心区域 - 上家出牌 -->
       <view class="center-area">
-        <!-- 当前回合提示 -->
-        <view class="current-turn-banner">
-          <text v-if="gameState?.phase === 'CHALLENGE'" class="turn-text challenge-phase">
-            ⚠️ 质疑阶段 - 可以质疑或放弃
-          </text>
-          <text v-else-if="canPlayCard" class="turn-text my-turn">👉 轮到你操作</text>
-          <text v-else class="turn-text waiting">{{ currentPlayerName }} 操作中...</text>
-        </view>
-
         <view v-if="gameState.last_play" class="last-play">
-          <text class="last-play-label">上家出牌</text>
+          <text class="last-play-info">P{{ lastPlayPlayerSeatIndex + 1 }} 出牌</text>
           <view class="last-play-cards">
             <view v-for="i in gameState.last_play.count" :key="i" class="play-card">
               <text class="card-text">{{ gameState.last_play.claim }}</text>
             </view>
           </view>
-          <text class="last-play-player">{{ lastPlayPlayerName }}</text>
         </view>
         <view v-else class="no-play">
           <text>暂无出牌</text>
@@ -193,7 +206,11 @@
               <view v-if="myPlayer" class="player-number my-number">P{{ myPlayer.seat_index + 1 }}</view>
               <view class="my-avatar">👤</view>
               <view class="my-details">
-                <text class="my-name">{{ authStore.user?.nickname || '我' }}</text>
+                <view class="player-name-row">
+                  <text class="my-name">{{ authStore.user?.nickname || '我' }}</text>
+                  <text v-if="myPlayer?.character_id" class="character-badge">{{ getCharacterName(myPlayer.character_id)
+                  }}</text>
+                </view>
                 <view class="my-hp">
                   <view v-for="i in 6" :key="i" class="hp-dot" :class="{ filled: i <= myPunishmentCount }"></view>
                 </view>
@@ -256,47 +273,7 @@
         </view>
 
         <!-- 行动日志/聊天面板 -->
-        <view class="action-log-panel">
-          <!-- 切换栏 -->
-          <view class="panel-tabs">
-            <view class="tab-item" :class="{ active: currentTab === 'chat' }" @tap="currentTab = 'chat'">
-              <text class="tab-text">💬 聊天</text>
-            </view>
-            <view class="tab-item" :class="{ active: currentTab === 'log' }" @tap="currentTab = 'log'">
-              <text class="tab-text">📋 日志</text>
-            </view>
-          </view>
 
-          <!-- 聊天标签页 -->
-          <view v-if="currentTab === 'chat'" class="chat-tab">
-            <!-- 聊天消息列表 -->
-            <scroll-view class="chat-messages" scroll-y="true" :scroll-top="chatScrollTop">
-              <view v-for="(msg, index) in chatMessages" :key="index" class="chat-item">
-                <text class="chat-sender">{{ msg.sender }}</text>
-                <text class="chat-text">{{ msg.content }}</text>
-              </view>
-              <view v-if="chatMessages.length === 0" class="log-empty">暂无聊天消息</view>
-            </scroll-view>
-
-            <!-- 消息输入框 -->
-            <view class="chat-input-box">
-              <input v-model="chatInput" class="chat-input" placeholder="输入消息..." :maxlength="200"
-                @confirm="sendChatMessage" />
-              <button class="chat-send-btn" @tap="sendChatMessage">
-                <text>发送</text>
-              </button>
-            </view>
-          </view>
-
-          <!-- 行动日志标签页 -->
-          <scroll-view v-if="currentTab === 'log'" class="log-content" scroll-y="true" :scroll-top="logScrollTop">
-            <view v-for="(log, index) in actionLogs" :key="index" class="log-item" :class="log.type">
-              <text class="log-time">{{ log.time }}</text>
-              <text class="log-text">{{ log.message }}</text>
-            </view>
-            <view v-if="actionLogs.length === 0" class="log-empty">暂无行动记录</view>
-          </scroll-view>
-        </view>
       </view>
     </view>
 
@@ -479,6 +456,19 @@ const myCharacter = computed(() => {
   return myPlayer.value?.character_id || ''
 })
 
+// 角色映射
+const characterNames = {
+  'scubby': 'Scubby',
+  'foxy': 'Foxy',
+  'bristle': 'Bristle',
+  'tor': 'Tor'
+}
+
+// 获取角色名称
+const getCharacterName = (characterId) => {
+  return characterNames[characterId] || ''
+}
+
 // 是否显示技能按钮（只要是Foxy就显示）
 const showSkillButton = computed(() => {
   return myCharacter.value === 'foxy'
@@ -506,6 +496,13 @@ const lastPlayPlayerName = computed(() => {
   const playerId = gameState.value.last_play.player_id
   const player = gameState.value.players?.find(p => p.id === playerId)
   return player?.nickname || '玩家'
+})
+
+const lastPlayPlayerSeatIndex = computed(() => {
+  if (!gameState.value?.last_play) return 0
+  const playerId = gameState.value.last_play.player_id
+  const player = gameState.value.players?.find(p => p.id === playerId)
+  return player?.seat_index ?? 0
 })
 
 const currentPlayerName = computed(() => {
@@ -1623,20 +1620,17 @@ function sendChatMessage() {
 }
 
 .back-btn {
-  padding: 15px 25px;
-  background: rgba(60, 30, 30, 0.8);
-  /* border: 1px solid #5c2e2e; */
-  /* border-radius: 4px; */
+  padding: 10px 25px;
   color: #d4a574;
   font-size: 15px;
   font-weight: 600;
-  /* height: 25px; */
   line-height: 8px;
+  cursor: pointer;
   transition: all 0.2s;
 }
 
 .back-btn:active {
-  background: rgba(80, 40, 40, 0.9);
+  opacity: 0.7;
   transform: scale(0.95);
 }
 
@@ -1649,7 +1643,7 @@ function sendChatMessage() {
 .round-badge,
 .turn-badge,
 .target-badge {
-  padding: 15px 10px;
+  padding: 10px 10px;
   background: rgba(60, 30, 30, 0.8);
   border: 1px solid #5c2e2e;
   border-radius: 4px;
@@ -1662,7 +1656,7 @@ function sendChatMessage() {
 }
 
 .alive-count {
-  padding: 15px 10px;
+  padding: 10px 10px;
   background: rgba(60, 30, 30, 0.8);
   border: 1px solid #5c2e2e;
   border-radius: 4px;
@@ -1675,7 +1669,7 @@ function sendChatMessage() {
 
 .rules-btn {
   margin-right: 40px;
-  padding: 15px 10px;
+  padding: 10px 10px;
   background: rgba(60, 30, 30, 0.8);
   border: 1px solid #5c2e2e;
   border-radius: 4px;
@@ -1787,7 +1781,7 @@ function sendChatMessage() {
 
 .player-card {
   position: relative;
-  width: 90px;
+  width: 120px;
   padding: 6px;
   background: rgba(30, 10, 10, 0.85);
   border: 1px solid #5c2e2e;
@@ -1827,6 +1821,7 @@ function sendChatMessage() {
 }
 
 .player-number.my-number {
+  top: 2rpx;
   border-color: #f59e0b;
   color: #f59e0b;
   box-shadow: 0 2px 8px rgba(245, 158, 11, 0.6);
@@ -1845,17 +1840,33 @@ function sendChatMessage() {
   font-size: 14px;
 }
 
+.player-name-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
 .player-name {
-  display: block;
   color: #d4a574;
   font-size: 11px;
   font-weight: 600;
-  text-align: center;
-  margin-bottom: 4px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   line-height: 11px;
+}
+
+.character-badge {
+  padding: 2px 6px;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  border-radius: 8px;
+  color: #1a0f0a;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(245, 158, 11, 0.4);
 }
 
 .player-hp {
@@ -1924,16 +1935,21 @@ function sendChatMessage() {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 80px;
+  /* min-height: 80px; */
   gap: 10px;
+  transform: translateY(-10px);
 }
 
 .current-turn-banner {
+  position: absolute;
+  top: 10px;
+  right: 20px;
   padding: 8px 20px;
   border-radius: 20px;
   background: rgba(30, 10, 10, 0.95);
   border: 2px solid #5c2e2e;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  z-index: 50;
 }
 
 .turn-text {
@@ -1970,14 +1986,14 @@ function sendChatMessage() {
 
 .last-play {
   text-align: center;
-  padding: 10px;
+  padding: 3px 10px;
   background: rgba(30, 10, 10, 0.85);
   border: 2px solid #5c2e2e;
   border-radius: 6px;
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
 }
 
-.last-play-label {
+.last-play-info {
   display: block;
   color: #a08060;
   font-size: 11px;
@@ -1993,8 +2009,8 @@ function sendChatMessage() {
 }
 
 .play-card {
-  width: 40px;
-  height: 56px;
+  width: 30px;
+  height: 40px;
   background: linear-gradient(160deg, #f5e6d3 0%, #d6c0a9 100%);
   border: 2px solid #8a6a4a;
   border-radius: 4px;
@@ -2005,7 +2021,7 @@ function sendChatMessage() {
 }
 
 .card-text {
-  font-size: 20px;
+  font-size: 14px;
   font-weight: 800;
   color: #2d1f14;
 }
@@ -2029,6 +2045,9 @@ function sendChatMessage() {
   display: flex;
   gap: 12px;
   flex-shrink: 0;
+  flex: 0.7;
+  width: 60%;
+  margin: 0 auto 20px;
 }
 
 /* 自己的手牌区域 - 高度控制在100px内 */
@@ -2042,12 +2061,13 @@ function sendChatMessage() {
   background: rgba(30, 10, 10, 0.9);
   border: 2px solid #5c2e2e;
   border-radius: 6px;
-  padding: 8px 8px 20px 8px;
+  padding: 8px 8px 10px 8px;
   box-shadow: 0 -3px 10px rgba(0, 0, 0, 0.5);
   flex-shrink: 0;
 }
 
 .my-info {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2056,6 +2076,7 @@ function sendChatMessage() {
 }
 
 .my-avatar {
+  margin-left: 26rpx;
   width: 28px;
   /* height: 28px; */
   background: rgba(60, 30, 30, 0.6);
@@ -2157,7 +2178,7 @@ function sendChatMessage() {
 
 .skill-btn-sidebar {
   width: 80px;
-  height: 66px;
+  height: 40px;
   padding: 4px 8px;
   display: flex;
   flex-direction: row;
