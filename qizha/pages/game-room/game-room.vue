@@ -226,19 +226,25 @@
                 出牌({{ selectedCards.length }})
               </button>
 
-              <!-- 质疑按钮 -->
-              <button v-if="canChallenge" class="top-btn challenge-btn" @tap="challenge">
+              <!-- 质疑按钮 - 手牌为0时禁用 -->
+              <button v-if="canChallenge" class="top-btn challenge-btn"
+                :disabled="myHandCards.length === 0"
+                @tap="challenge">
                 质疑
               </button>
 
-              <!-- 跳过按钮 - 只在质疑阶段显示，且不能是刚出牌的玩家 -->
-              <button v-if="canPass && gameState?.phase === 'CHALLENGE' && !isLastPlayByMe" class="top-btn pass-btn" @tap="passTurn">
+              <!-- 跳过按钮 - 只在质疑阶段显示，且不能是刚出牌的玩家，手牌为0时不显示（自动跳过） -->
+              <button v-if="canPass && gameState?.phase === 'CHALLENGE' && !isLastPlayByMe && myHandCards.length > 0"
+                class="top-btn pass-btn" @tap="passTurn">
                 放弃
               </button>
 
               <!-- 状态提示 -->
               <text v-if="myPlayer && myPlayer.hand_count === 0 && gameState?.phase === 'PLAYING'" class="status-text">
                 手牌已空，自动跳过
+              </text>
+              <text v-else-if="myPlayer && myPlayer.hand_count === 0 && gameState?.phase === 'CHALLENGE'" class="status-text">
+                手牌已空，自动放弃质疑
               </text>
               <text v-else-if="gameState?.phase === 'CHALLENGE' && !hasAnyAction" class="status-text">
                 等待质疑...
@@ -868,12 +874,16 @@ watch(
       '手牌为0': newVal.handCount === 0
     })
 
-    // 修改条件：只要轮到自己且手牌为0，就自动跳过
-    // 在PLAYING阶段：手牌为0则无法出牌，自动跳过
-    // 在CHALLENGE阶段：如果是自己出的牌，不应该质疑自己，自动跳过
-    if (isMyTurn && newVal.handCount === 0 && (newVal.phase === 'PLAYING' || newVal.phase === 'CHALLENGE')) {
+    // 自动跳过逻辑：
+    // 1. PLAYING阶段：轮到自己且手牌为0，自动跳过
+    // 2. CHALLENGE阶段：手牌为0且可以PASS（不管是不是自己的回合），自动跳过
+    const shouldAutoPass =
+      (newVal.phase === 'PLAYING' && isMyTurn && newVal.handCount === 0) ||
+      (newVal.phase === 'CHALLENGE' && newVal.handCount === 0 && canPass)
+
+    if (shouldAutoPass) {
       // 生成唯一key，避免同一回合重复触发
-      const autoPassKey = `${newVal.currentTurn}-${newVal.mySeatIndex}-${newVal.phase}`
+      const autoPassKey = `${newVal.currentTurn}-${newVal.mySeatIndex}-${newVal.phase}-${newVal.currentPlayer}`
 
       if (lastAutoPassKey === autoPassKey) {
         console.log('⏭️ 已经处理过这个回合的自动跳过，忽略')
@@ -882,8 +892,9 @@ watch(
 
       lastAutoPassKey = autoPassKey
 
-      console.log('✅ 检测到手牌为0且轮到自己，准备自动跳过回合（忽略legal_actions）')
+      console.log('✅ 检测到手牌为0，准备自动跳过')
       console.log('当前阶段:', newVal.phase, '座位:', newVal.mySeatIndex, '手牌数:', newVal.handCount)
+      console.log('isMyTurn:', isMyTurn, 'canPass:', canPass)
 
       // 清除之前的定时器
       if (autoPassTimer) {
@@ -892,7 +903,7 @@ watch(
 
       autoPassTimer = setTimeout(() => {
         console.log('🚀 执行自动跳过 - 强制发送PASS')
-        // 直接发送PASS，不依赖passTurn函数（因为canPass可能为false）
+        // 直接发送PASS，不依赖passTurn函数
         wsClient.send('PASS')
 
         // 记录日志

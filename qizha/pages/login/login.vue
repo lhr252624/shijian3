@@ -203,7 +203,7 @@ export default {
   outline: none;
   color: rgba(180, 180, 180, 0.9);
   font-size: 15px;
-  padding: 0 40px;
+  padding: 0 10px;
   caret-color: #888;
   transition: all 0.3s ease;
   box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5);
