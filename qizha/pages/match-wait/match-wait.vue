@@ -80,21 +80,27 @@ async function cancelMatch() {
 
 <style scoped>
 .match-page {
+  position: fixed;
+  top: 0;
+  left: 0;
   width: 100vw;
   height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   background: linear-gradient(145deg, #1a0f0a 0%, #2a1812 50%, #1f1208 100%);
+  z-index: 9999;
 }
 
 .match-card {
+  position: relative;
   text-align: center;
   padding: 50px 60px;
   background: rgba(30, 10, 10, 0.9);
   border: 2px solid #5c2e2e;
   border-radius: 12px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), inset 0 1px 2px rgba(139, 69, 19, 0.2);
+  z-index: 10000;
 }
 
 .spinner {

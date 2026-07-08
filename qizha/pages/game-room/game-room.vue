@@ -79,9 +79,35 @@
 
     <!-- 游戏区域 -->
     <view v-if="gameState && gameState.phase !== 'GAME_OVER'" class="game-area">
-      <!-- 对手区域 -->
+      <!-- 左侧对手 -->
+      <view v-if="opponents[0]" class="left-opponent">
+        <view class="player-card player-card-vertical"
+          :class="{ active: gameState.current_player === opponents[0].seat_index, eliminated: !opponents[0].is_alive }">
+          <!-- 玩家编号 -->
+          <view class="player-number">P{{ opponents[0].seat_index + 1 }}</view>
+          <view class="player-avatar">
+            <text v-if="opponents[0].is_ai">🤖</text>
+            <text v-else>👤</text>
+          </view>
+          <text class="player-name">{{ opponents[0].nickname }}</text>
+          <view class="player-hp">
+            <view v-for="i in 6" :key="i" class="hp-dot"
+              :class="{ filled: i <= (opponents[0].bullets || opponents[0].punishment_count || 0) }">
+            </view>
+          </view>
+          <text class="card-count">{{ opponents[0].hand_count }} 张牌</text>
+          <!-- 显示最近出牌信息 -->
+          <text v-if="gameState.last_play && gameState.last_play.player_id === opponents[0].id" class="last-played">
+            刚出 {{ gameState.last_play.count }} 张 {{ gameState.last_play.claim }}
+          </text>
+          <view v-if="opponents[0].is_ai" class="ai-tag">AI</view>
+          <view v-if="!opponents[0].is_alive" class="dead-tag">💀</view>
+        </view>
+      </view>
+
+      <!-- 对手区域（顶部剩余两个） -->
       <view class="opponents-row">
-        <view v-for="player in opponents" :key="player.id" class="player-card"
+        <view v-for="player in opponents.slice(1)" :key="player.id" class="player-card"
           :class="{ active: gameState.current_player === player.seat_index, eliminated: !player.is_alive }">
           <!-- 玩家编号 -->
           <view class="player-number">P{{ player.seat_index + 1 }}</view>
@@ -228,13 +254,8 @@
 
             <!-- 消息输入框 -->
             <view class="chat-input-box">
-              <input
-                v-model="chatInput"
-                class="chat-input"
-                placeholder="输入消息..."
-                :maxlength="200"
-                @confirm="sendChatMessage"
-              />
+              <input v-model="chatInput" class="chat-input" placeholder="输入消息..." :maxlength="200"
+                @confirm="sendChatMessage" />
               <button class="chat-send-btn" @tap="sendChatMessage">
                 <text>发送</text>
               </button>
@@ -600,7 +621,7 @@ onMounted(async () => {
     // 等待WebSocket连接后，发送加入房间消息
     setTimeout(() => {
       console.log('发送 PLAYER_JOIN 消息，roomId:', roomId.value)
-      wsClient.send('PLAYER_JOIN', {})
+      wsClient.send('PLAYER_JOIN', { room_id: roomId.value })
     }, 500)
 
     console.log('注册 WebSocket 事件监听器')
@@ -1709,6 +1730,19 @@ function sendChatMessage() {
 }
 
 /* 对手区域 - 每个卡片高度约25px */
+/* 左侧对手 */
+.left-opponent {
+  position: absolute;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-100%);
+  z-index: 10;
+}
+
+.player-card-vertical {
+  width: 100px;
+}
+
 .opponents-row {
   display: flex;
   gap: 6px;
@@ -2260,7 +2294,7 @@ function sendChatMessage() {
   background: rgba(30, 10, 10, 0.95);
   border: 2px solid #5c2e2e;
   border-radius: 12px;
-  padding: 24px;
+  padding: 4px;
   min-width: 500px;
   max-width: 80vw;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
@@ -2269,7 +2303,7 @@ function sendChatMessage() {
 .wait-title {
   display: block;
   color: #d4a574;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
   margin-bottom: 8px;
   text-align: center;
@@ -2279,7 +2313,7 @@ function sendChatMessage() {
   display: block;
   color: #a08060;
   font-size: 14px;
-  margin-bottom: 20px;
+  margin-bottom: 10px;
   text-align: center;
 }
 
@@ -2335,10 +2369,10 @@ function sendChatMessage() {
 }
 
 .ready-btn {
-  width: 100%;
+  width: 50%;
   background: linear-gradient(145deg, #4ade80 0%, #22c55e 100%);
   color: #000;
-  padding: 12px;
+  padding: 2px 6px;
   font-size: 16px;
   font-weight: 700;
   border-radius: 6px;

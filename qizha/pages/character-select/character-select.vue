@@ -183,11 +183,16 @@ async function confirmAndMatch() {
     return
   }
 
+  console.log('========== 开始匹配 ==========')
+  console.log('选中的角色ID:', selectedCharacter.value)
+  console.log('发送的数据:', { character_id: selectedCharacter.value })
+  console.log('================================')
+
   loading.value = true
   try {
     // 调用匹配API，传入角色ID
-    await matchAPI.start({ character_id: selectedCharacter.value })
-    console.log('开始匹配，角色:', selectedCharacter.value)
+    const result = await matchAPI.start({ character_id: selectedCharacter.value })
+    console.log('匹配API返回结果:', result)
 
     // 跳转到匹配等待页面
     uni.redirectTo({
