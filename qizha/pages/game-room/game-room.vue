@@ -275,6 +275,59 @@
         <!-- 行动日志/聊天面板 -->
 
       </view>
+
+      <!-- 消息和日志气泡图标 -->
+      <view class="bubble-container">
+        <!-- 聊天气泡图标 -->
+        <view class="bubble-icon" @tap="toggleChatPanel">
+          <text class="bubble-emoji">💬</text>
+          <view v-if="chatMessages.length > 0" class="bubble-badge">{{ chatMessages.length }}</view>
+        </view>
+
+        <!-- 日志气泡图标 -->
+        <view class="bubble-icon" @tap="toggleLogPanel">
+          <text class="bubble-emoji">📋</text>
+          <view v-if="gameLogs.length > 0" class="bubble-badge">{{ gameLogs.length }}</view>
+        </view>
+      </view>
+
+      <!-- 聊天面板（绝对定位） -->
+      <view v-if="chatExpanded" class="chat-panel-overlay">
+        <view class="chat-panel">
+          <view class="panel-header">
+            <text class="panel-title">聊天消息</text>
+            <text class="panel-close" @tap="chatExpanded = false">✕</text>
+          </view>
+          <scroll-view class="chat-messages-area" scroll-y :scroll-into-view="chatScrollIntoView" scroll-with-animation>
+            <view v-if="chatMessages.length === 0" class="empty-hint">暂无消息</view>
+            <view v-for="(msg, idx) in chatMessages" :key="idx" :id="msg.id" class="message-item">
+              <text class="msg-sender">{{ msg.sender || msg.sender_name }}:</text>
+              <text class="msg-text"> {{ msg.text || msg.content }}</text>
+            </view>
+          </scroll-view>
+          <view class="chat-input-area">
+            <input v-model="chatText" class="chat-input" placeholder="输入消息..." @confirm="sendChatMessage" />
+            <button class="send-btn" @tap="sendChatMessage">发送</button>
+          </view>
+        </view>
+      </view>
+
+      <!-- 日志面板（绝对定位） -->
+      <view v-if="logExpanded" class="log-panel-overlay">
+        <view class="log-panel">
+          <view class="panel-header">
+            <text class="panel-title">游戏日志</text>
+            <text class="panel-close" @tap="logExpanded = false">✕</text>
+          </view>
+          <scroll-view class="log-content-area" scroll-y :scroll-into-view="logScrollIntoView" scroll-with-animation>
+            <view v-if="gameLogs.length === 0" class="empty-hint">暂无日志</view>
+            <view v-for="(log, idx) in gameLogs" :key="idx" :id="log.id" class="log-item"
+              :class="'log-type-' + log.type">
+              <text class="log-text">{{ log.text }}</text>
+            </view>
+          </scroll-view>
+        </view>
+      </view>
     </view>
 
     <!-- 规则弹窗 -->
@@ -323,7 +376,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, onActivated, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onActivated, nextTick, watch } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { useAuthStore } from '../../stores/auth'
 import { useGameStore } from '../../stores/game'
@@ -351,7 +404,40 @@ const leaveReason = ref('')
 const leaveDetail = ref('')
 const connecting = ref(true)
 const chatMessages = ref([])
+const gameLogs = ref([])
+const chatExpanded = ref(false)
+const logExpanded = ref(false)
 const chatText = ref('')
+const chatScrollIntoView = ref('')
+const logScrollIntoView = ref('')
+
+// 追踪上一次的游戏阶段，用于检测无人质疑
+const previousPhase = ref(null)
+const lastChallengePhase = ref(false)
+const previousRound = ref(null)
+const lastPlayRecord = ref(null) // 记录上一次出牌，用于去重
+
+// 日志类型枚举
+const LogType = {
+  ROUND_START: 'round_start',      // 轮次开始
+  PLAY_CARD: 'play_card',          // 玩家出牌
+  CHALLENGE: 'challenge',          // 质疑动作
+  NO_CHALLENGE: 'no_challenge',    // 无人质疑
+  PUNISHMENT: 'punishment',        // 惩罚结果
+  ELIMINATION: 'elimination',      // 玩家淘汰
+  SKILL: 'skill',                  // 技能使用
+  GAME_END: 'game_end'            // 游戏结束
+}
+
+// 添加日志的方法
+const addGameLog = (text, type = LogType.PLAY_CARD) => {
+  gameLogs.value.push({
+    text,
+    type,
+    timestamp: Date.now(),
+    id: `log${Date.now()}${Math.floor(Math.random() * 10000)}`
+  })
+}
 
 // Foxy技能相关
 const skillUsed = ref(false)
@@ -703,6 +789,42 @@ onUnmounted(() => {
   wsClient.off('SKILL_RESULT', onSkillResult)
 })
 
+// 监听聊天消息数组变化，自动滚动到底部
+watch(() => chatMessages.value.length, (newLength) => {
+  console.log('聊天消息数量变化:', newLength)
+  if (newLength > 0) {
+    nextTick(() => {
+      const lastMsg = chatMessages.value[newLength - 1]
+      console.log('最后一条消息:', lastMsg)
+      if (lastMsg && lastMsg.id) {
+        console.log('设置滚动目标:', lastMsg.id)
+        // 使用 setTimeout 确保 DOM 已更新
+        setTimeout(() => {
+          chatScrollIntoView.value = lastMsg.id
+        }, 50)
+      }
+    })
+  }
+})
+
+// 监听游戏日志数组变化，自动滚动到底部
+watch(() => gameLogs.value.length, (newLength) => {
+  console.log('游戏日志数量变化:', newLength)
+  if (newLength > 0) {
+    nextTick(() => {
+      const lastLog = gameLogs.value[newLength - 1]
+      console.log('最后一条日志:', lastLog)
+      if (lastLog && lastLog.id) {
+        console.log('设置日志滚动目标:', lastLog.id)
+        // 使用 setTimeout 确保 DOM 已更新
+        setTimeout(() => {
+          logScrollIntoView.value = lastLog.id
+        }, 50)
+      }
+    })
+  }
+})
+
 async function loadRoomData() {
   try {
     const res = await roomAPI.get(roomId.value)
@@ -914,6 +1036,12 @@ function onSkillResult(payload) {
     const targetName = target?.nickname || '玩家'
     const duration = Math.floor((payload.duration_ms || 3000) / 1000)
 
+    // 添加日志：技能使用（使用者信息从payload中获取）
+    const user = gameState.value?.players?.find(p => p.id === payload.user_id || myPlayerId.value)
+    if (user && target) {
+      addGameLog(`🔍 P${user.seat_index + 1} ${user.nickname} 使用Foxy技能偷看了 P${target.seat_index + 1} ${target.nickname} 的手牌`, LogType.SKILL)
+    }
+
     skillPeekResult.value = {
       targetName,
       cards: payload.hand || [],
@@ -953,7 +1081,8 @@ function addSystemMsg(content) {
     sender_id: 0,
     sender_name: '[系统]',
     content,
-    is_ai: false
+    is_ai: false,
+    id: `chat${Date.now()}${Math.floor(Math.random() * 10000)}`
   })
 }
 
@@ -1000,16 +1129,34 @@ function onGameState(payload) {
   console.log('========== GAME_STATE 接收 ==========')
   console.log('完整payload:', JSON.stringify(payload, null, 2))
   console.log('当前玩家座位:', payload.current_player)
-  console.log('当前回合:', payload.turn)
-  console.log('当前轮次:', payload.round)
+  console.log('当前回合:', payload.current_round)
+  console.log('当前轮次:', payload.current_turn)
   console.log('阶段:', payload.phase)
+
+  // 检测轮次变化：如果轮次增加，说明进入新轮次
+  if (previousRound.value !== null && payload.current_round > previousRound.value) {
+    addGameLog(`🎯 第 ${payload.current_round} 轮开始 - 目标牌：${payload.target_card}`, LogType.ROUND_START)
+  }
+  previousRound.value = payload.current_round
+
+  // 检测阶段变化：如果从CHALLENGE变为PLAYING，说明无人质疑
+  if (previousPhase.value === 'CHALLENGE' && payload.phase === 'PLAYING' && lastChallengePhase.value) {
+    addGameLog(`✓ 无人质疑，游戏继续`, LogType.NO_CHALLENGE)
+    lastChallengePhase.value = false
+  }
+
+  // 记录当前阶段
+  previousPhase.value = payload.phase
+  if (payload.phase === 'CHALLENGE') {
+    lastChallengePhase.value = true
+  }
 
   // 更新游戏状态
   gameState.value = {
     phase: payload.phase,
     current_player: payload.current_player,
-    current_turn: payload.turn || 0,
-    current_round: payload.round || 1,
+    current_turn: payload.current_turn || 0,
+    current_round: payload.current_round || 1,
     target_card: payload.target_card,
     alive_count: payload.players?.filter(p => p.is_alive).length || 0,
     players: payload.players || [],
@@ -1025,6 +1172,16 @@ function onGameState(payload) {
   if (payload.last_play) {
     const playerName = getPlayerName(payload.last_play.player_id)
     addActionLog(`${playerName} 出了 ${payload.last_play.count} 张 ${payload.last_play.claim}`, 'play')
+
+    // 添加日志：玩家出牌（去重检查）
+    const player = payload.players?.find(p => p.id === payload.last_play.player_id)
+    if (player) {
+      const playKey = `${payload.last_play.player_id}-${payload.current_turn}-${payload.last_play.count}-${payload.last_play.claim}`
+      if (lastPlayRecord.value !== playKey) {
+        addGameLog(`P${player.seat_index + 1} ${player.nickname} 出了 ${payload.last_play.count} 张 ${payload.last_play.claim}`, LogType.PLAY_CARD)
+        lastPlayRecord.value = playKey
+      }
+    }
   }
 
   // 找到当前操作的玩家
@@ -1042,7 +1199,7 @@ function onGameState(payload) {
     // 记录回合开始日志
     if (payload.phase === 'PLAYING') {
       const playerName = getPlayerName(currentPlayer.id)
-      addActionLog(`轮到 ${playerName} 行动 (回合${payload.turn})`, 'info')
+      addActionLog(`轮到 ${playerName} 行动 (回合${payload.current_turn})`, 'info')
     } else if (payload.phase === 'CHALLENGE') {
       addActionLog(`进入质疑阶段，可以质疑或放弃`, 'challenge')
     }
@@ -1069,25 +1226,34 @@ function onGameStarted(payload) {
     gameState.value = {
       phase: payload.phase,
       current_player: payload.current_player,
-      current_turn: 0,
-      current_round: payload.round || 1,
+      current_turn: payload.current_turn || 0,
+      current_round: payload.current_round || 1,
       target_card: payload.target_card,
       alive_count: payload.players?.filter(p => p.is_alive).length || 0,
       players: payload.players || [],
       last_play: null
     }
   }
-  addSystemMsg('游戏开始！')
+  // addSystemMsg('游戏开始！')
   showToast('游戏开始！', 'success')
-  addActionLog(`🎮 游戏开始！第 ${payload.round || 1} 轮，目标牌：${payload.target_card}`, 'system')
+  addActionLog(`🎮 游戏开始！第 ${payload.current_round || 1} 轮，目标牌：${payload.target_card}`, 'system')
+
+  // 添加日志：轮次开始
+  addGameLog(`🎯 第 ${payload.current_round || 1} 轮开始 - 目标牌：${payload.target_card}`, LogType.ROUND_START)
 }
 
 function onChallengeResult(payload) {
+  console.log('========== CHALLENGE_RESULT 事件触发 ==========')
   console.log('CHALLENGE_RESULT:', payload)
+  console.log('完整payload:', JSON.stringify(payload, null, 2))
+  console.log('==============================================')
+
+  // 标记已经发生质疑，不再触发"无人质疑"日志
+  lastChallengePhase.value = false
 
   const success = payload.success
   const challengerId = payload.challenger_id
-  const targetId = payload.target_id
+  const targetId = payload.liar_id || payload.loser_id // 修复：使用liar_id或loser_id作为被质疑者ID
   const loserId = payload.loser_id
 
   const challengerName = getPlayerName(challengerId)
@@ -1101,29 +1267,61 @@ function onChallengeResult(payload) {
   // #endif
 
   if (success) {
-    addSystemMsg(`质疑成功！玩家说谎，实际牌为：${payload.actual_cards?.join(', ')}`)
+    // addSystemMsg(`质疑成功！玩家说谎，实际牌为：${payload.actual_cards?.join(', ')}`)
     addActionLog(`${challengerName} 质疑 ${targetName}：质疑成功！对方在说谎`, 'challenge')
-    addActionLog(`实际牌为：${payload.actual_cards?.join(', ')}`, 'challenge')
+    addActionLog(`实际牌为：${payload.challenged_cards?.join(', ')}`, 'challenge')
+
+    // 添加日志：质疑成功
+    const challenger = gameState.value?.players?.find(p => p.id === challengerId)
+    const target = gameState.value?.players?.find(p => p.id === targetId)
+    console.log('质疑成功 - challenger:', challenger, 'target:', target)
+    if (challenger && target) {
+      addGameLog(`⚠️ P${challenger.seat_index + 1} ${challenger.nickname} 质疑成功！P${target.seat_index + 1} ${target.nickname} 在说谎`, LogType.CHALLENGE)
+    } else {
+      console.error('找不到玩家信息！challengerId:', challengerId, 'targetId:', targetId)
+    }
   } else {
-    addSystemMsg(`质疑失败！对方说的是真话`)
+    // addSystemMsg(`质疑失败！对方说的是真话`)
     addActionLog(`${challengerName} 质疑 ${targetName}：质疑失败！对方说真话`, 'challenge')
+
+    // 添加日志：质疑失败
+    const challenger = gameState.value?.players?.find(p => p.id === challengerId)
+    const target = gameState.value?.players?.find(p => p.id === targetId)
+    console.log('质疑失败 - challenger:', challenger, 'target:', target)
+    if (challenger && target) {
+      addGameLog(`⚠️ P${challenger.seat_index + 1} ${challenger.nickname} 质疑失败！P${target.seat_index + 1} ${target.nickname} 说的是真话`, LogType.CHALLENGE)
+    } else {
+      console.error('找不到玩家信息！challengerId:', challengerId, 'targetId:', targetId)
+    }
   }
 }
 
 function onRoulette(payload) {
   console.log('RUSSIAN_ROULETTE:', payload)
+  console.log('RUSSIAN_ROULETTE完整payload:', JSON.stringify(payload, null, 2))
   const playerId = payload.player_id
   const survived = payload.survived
   const bulletCount = payload.bullet_count
 
   const playerName = getPlayerName(playerId)
+  const player = gameState.value?.players?.find(p => p.id === playerId)
 
   if (survived) {
-    addSystemMsg(`玩家${playerId}扣动扳机${bulletCount}次，幸存！`)
+    // addSystemMsg(`玩家${playerId}扣动扳机${bulletCount}次，幸存！`)
     addActionLog(`🎲 ${playerName} 进入惩罚阶段，扣动扳机 ${bulletCount} 次 → 幸存`, 'punishment')
+
+    // 添加日志：惩罚-存活
+    if (player) {
+      addGameLog(`🎲 P${player.seat_index + 1} ${player.nickname} 扣动扳机 ${bulletCount} 次 → 幸存`, LogType.PUNISHMENT)
+    }
   } else {
-    addSystemMsg(`玩家${playerId}扣动扳机${bulletCount}次，被击中！`)
+    // addSystemMsg(`玩家${playerId}扣动扳机${bulletCount}次，被击中！`)
     addActionLog(`💥 ${playerName} 进入惩罚阶段，扣动扳机 ${bulletCount} 次 → 被击中！`, 'punishment')
+
+    // 添加日志：惩罚-死亡
+    if (player) {
+      addGameLog(`💥 P${player.seat_index + 1} ${player.nickname} 扣动扳机 ${bulletCount} 次 → 被击中`, LogType.ELIMINATION)
+    }
   }
 }
 
@@ -1138,8 +1336,14 @@ function onPlayerEliminated(payload) {
   // #endif
 
   const playerName = getPlayerName(playerId)
-  addSystemMsg(`${playerName} 被淘汰`)
+  // addSystemMsg(`${playerName} 被淘汰`)
   addActionLog(`💀 ${playerName} 被淘汰出局`, 'eliminate')
+
+  // 添加日志：玩家淘汰
+  const player = gameState.value?.players?.find(p => p.id === playerId)
+  if (player) {
+    addGameLog(`💀 P${player.seat_index + 1} ${player.nickname} 被淘汰出局`, LogType.ELIMINATION)
+  }
 
   // 更新玩家存活状态
   if (gameState.value?.players) {
@@ -1160,8 +1364,14 @@ function onGameOver(payload) {
   }
 
   const winnerName = getPlayerName(payload.winner_id)
-  addSystemMsg(`游戏结束！${winnerName} 获胜`)
+  // addSystemMsg(`游戏结束！${winnerName} 获胜`)
   addActionLog(`🏆 游戏结束！${winnerName} 获得胜利`, 'system')
+
+  // 添加日志：游戏结束
+  const winner = gameState.value?.players?.find(p => p.id === payload.winner_id)
+  if (winner) {
+    addGameLog(`🏆 游戏结束！P${winner.seat_index + 1} ${winner.nickname} 获得胜利`, LogType.GAME_END)
+  }
 }
 
 function onPlayerLeft(payload) {
@@ -1177,11 +1387,11 @@ function onPlayerLeft(payload) {
       phase: 'GAME_OVER',
       winner_id: payload.winner_id
     }
-    addSystemMsg(leaveDetail.value)
+    // addSystemMsg(leaveDetail.value)
     addActionLog(`🚪 ${name} 退出游戏，本局结束`, 'system')
   } else {
     const name = payload.nickname || `玩家${payload.player_id}`
-    addSystemMsg(`${name} 离开了房间`)
+    // addSystemMsg(`${name} 离开了房间`)
     addActionLog(`🚪 ${name} 离开了房间`, 'system')
   }
 }
@@ -1189,7 +1399,7 @@ function onPlayerLeft(payload) {
 function onPlayerJoined(payload) {
   console.log('PLAYER_JOINED:', payload)
   const name = payload.nickname || `玩家${payload.player_id}`
-  addSystemMsg(`${name} 加入了房间`)
+  // addSystemMsg(`${name} 加入了房间`)
   addActionLog(`👋 ${name} 加入了房间`, 'system')
 }
 
@@ -1198,22 +1408,50 @@ function onChat(payload) {
   chatMessages.value.push({
     sender: payload.sender_name || `玩家${payload.sender_id}`,
     content: payload.content,
-    isAi: payload.is_ai || false
-  })
-
-  // 自动滚动到底部
-  nextTick(() => {
-    chatScrollTop.value = chatScrollTop.value + 9999
+    isAi: payload.is_ai || false,
+    id: `chat${Date.now()}${Math.floor(Math.random() * 10000)}`
   })
 }
 
-// 发送聊天消息
+// 切换聊天面板
+function toggleChatPanel() {
+  console.log('点击聊天按钮，当前聊天消息:', chatMessages.value)
+  console.log('聊天消息数量:', chatMessages.value.length)
+
+  // 如果日志面板打开，先关闭
+  if (logExpanded.value) {
+    logExpanded.value = false
+  }
+
+  // 切换聊天面板
+  chatExpanded.value = !chatExpanded.value
+  console.log('聊天面板状态:', chatExpanded.value ? '打开' : '关闭')
+}
+
+// 切换日志面板
+function toggleLogPanel() {
+  console.log('点击日志按钮，当前日志:', gameLogs.value)
+  console.log('日志数量:', gameLogs.value.length)
+
+  // 如果聊天面板打开，先关闭
+  if (chatExpanded.value) {
+    chatExpanded.value = false
+  }
+
+  // 切换日志面板
+  logExpanded.value = !logExpanded.value
+  console.log('日志面板状态:', logExpanded.value ? '打开' : '关闭')
+}
+
+// 发送聊天消息（气泡面板使用）
 function sendChatMessage() {
-  if (!chatInput.value.trim()) {
+  if (!chatText.value.trim()) {
+    console.log('消息为空，不发送')
     return
   }
 
-  const message = chatInput.value.trim()
+  const message = chatText.value.trim()
+  console.log('准备发送消息:', message)
 
   // 通过 WebSocket 发送聊天消息
   wsClient.send({
@@ -1223,10 +1461,17 @@ function sendChatMessage() {
     }
   })
 
-  // 清空输入框
-  chatInput.value = ''
+  // 添加到本地消息列表
+  chatMessages.value.push({
+    sender: '我',
+    text: message,
+    id: `chat${Date.now()}${Math.floor(Math.random() * 10000)}`
+  })
 
-  console.log('发送聊天消息:', message)
+  // 清空输入框
+  chatText.value = ''
+
+  console.log('消息已发送，当前聊天列表:', chatMessages.value)
 }
 </script>
 
@@ -1530,7 +1775,7 @@ function sendChatMessage() {
 .bar-bg__wall {
   position: absolute;
   inset: 0;
-  margin-top: -60px;
+  margin-top: -60rpx;
   background-image: url('../../static/images/game.jpg');
   background-size: cover;
   background-position: center;
@@ -1558,8 +1803,8 @@ function sendChatMessage() {
 
 .fx-burst {
   position: absolute;
-  width: 150px;
-  height: 150px;
+  width: 150rpx;
+  height: 150rpx;
   border-radius: 50%;
   animation: burst 0.8s ease-out;
 }
@@ -1606,21 +1851,21 @@ function sendChatMessage() {
 
 /* 顶部栏 - 最大高度30px */
 .top-bar {
-  padding: 5px 0 5px 20px;
+  padding: 5rpx 0 5rpx 20rpx;
   position: relative;
   z-index: 100;
   display: flex;
   align-items: center;
-  gap: 8px;
-  /* padding: 6px 12px; */
+  gap: 8rpx;
+  /* padding: 6rpx 12rpx; */
   background: rgba(30, 10, 10, 0.9);
-  border-bottom: 2px solid #5c2e2e;
+  border-bottom: 2rpx solid #5c2e2e;
   /* height: 40px; */
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.5);
 }
 
 .back-btn {
-  padding: 10px 25px;
+  padding: 10rpx 25rpx;
   color: #d4a574;
   font-size: 15px;
   font-weight: 600;
@@ -1643,10 +1888,10 @@ function sendChatMessage() {
 .round-badge,
 .turn-badge,
 .target-badge {
-  padding: 10px 10px;
+  padding: 10rpx 10rpx;
   background: rgba(60, 30, 30, 0.8);
-  border: 1px solid #5c2e2e;
-  border-radius: 4px;
+  border: 1rpx solid #5c2e2e;
+  border-radius: 4rpx;
   color: #d4a574;
   font-size: 11px;
   font-weight: 600;
@@ -1656,10 +1901,10 @@ function sendChatMessage() {
 }
 
 .alive-count {
-  padding: 10px 10px;
+  padding: 10rpx 10rpx;
   background: rgba(60, 30, 30, 0.8);
-  border: 1px solid #5c2e2e;
-  border-radius: 4px;
+  border: 1rpx solid #5c2e2e;
+  border-radius: 4rpx;
   color: #4ade80;
   font-size: 11px;
   font-weight: 600;
@@ -1668,11 +1913,11 @@ function sendChatMessage() {
 }
 
 .rules-btn {
-  margin-right: 40px;
-  padding: 10px 10px;
+  margin-right: 40rpx;
+  padding: 10rpx 10rpx;
   background: rgba(60, 30, 30, 0.8);
-  border: 1px solid #5c2e2e;
-  border-radius: 4px;
+  border: 1rpx solid #5c2e2e;
+  border-radius: 4rpx;
   color: #d4a574;
   font-size: 11px;
   /* height: 22px; */
@@ -1729,10 +1974,10 @@ function sendChatMessage() {
 }
 
 .game-over-btn {
-  padding: 10px 28px;
+  padding: 10rpx 28rpx;
   background: linear-gradient(145deg, #8a4a4a 0%, #5c2e2e 100%);
-  border: 1px solid #5a3a1e;
-  border-radius: 6px;
+  border: 1rpx solid #5a3a1e;
+  border-radius: 6rpx;
   color: #d4a574;
   font-size: 13px;
   font-weight: 600;
@@ -1742,18 +1987,18 @@ function sendChatMessage() {
 .game-area {
   position: relative;
   z-index: 10;
-  height: calc(100vh - 30px);
+  height: calc(100vh - 40rpx);
   display: flex;
   flex-direction: column;
-  padding: 8px;
-  gap: 8px;
+  padding: 8rpx;
+  gap: 8rpx;
 }
 
 /* 对手区域 - 每个卡片高度约25px */
 /* 左侧对手 */
 .left-opponent {
   position: absolute;
-  left: 20px;
+  left: 20rpx;
   top: 50%;
   transform: translateY(-100%);
   z-index: 10;
@@ -1762,31 +2007,31 @@ function sendChatMessage() {
 /* 右侧对手 */
 .right-opponent {
   position: absolute;
-  right: 20px;
+  right: 20rpx;
   top: 50%;
   transform: translateY(-100%);
   z-index: 10;
 }
 
 .player-card-vertical {
-  width: 100px;
+  width: 100rpx;
 }
 
 .opponents-row {
   display: flex;
-  gap: 6px;
+  gap: 6rpx;
   justify-content: center;
   flex-shrink: 0;
 }
 
 .player-card {
   position: relative;
-  width: 120px;
-  padding: 6px;
+  width: 120rpx;
+  padding: 6rpx;
   background: rgba(30, 10, 10, 0.85);
-  border: 1px solid #5c2e2e;
-  border-radius: 6px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  border: 1rpx solid #5c2e2e;
+  border-radius: 6rpx;
+  box-shadow: 0 2rpx 4rpx rgba(0, 0, 0, 0.5);
   transition: all 0.2s;
 }
 
@@ -1803,12 +2048,12 @@ function sendChatMessage() {
 /* 玩家编号标签 */
 .player-number {
   position: absolute;
-  top: 4px;
-  left: 4px;
-  width: 24px;
-  height: 24px;
+  top: 4rpx;
+  left: 4rpx;
+  width: 24rpx;
+  height: 24rpx;
   background: linear-gradient(135deg, #5a3a1e 0%, #3a2616 100%);
-  border: 2px solid #d4a574;
+  border: 2rpx solid #d4a574;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -1817,22 +2062,23 @@ function sendChatMessage() {
   font-size: 11px;
   font-weight: 700;
   z-index: 10;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.6);
 }
 
 .player-number.my-number {
   top: 2rpx;
+  left: 1rpx;
   border-color: #f59e0b;
   color: #f59e0b;
-  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.6);
+  box-shadow: 0 2rpx 8rpx rgba(245, 158, 11, 0.6);
 }
 
 .player-avatar {
-  width: 24px;
-  height: 24px;
-  margin: 0 auto 4px;
+  width: 24rpx;
+  height: 24rpx;
+  margin: 0 auto 4rpx;
   background: rgba(60, 30, 30, 0.6);
-  border: 1px solid #5a3a1e;
+  border: 1rpx solid #5a3a1e;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -1843,9 +2089,9 @@ function sendChatMessage() {
 .player-name-row {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 4rpx;
   justify-content: center;
-  margin-bottom: 4px;
+  margin-bottom: 4rpx;
 }
 
 .player-name {
@@ -1859,7 +2105,7 @@ function sendChatMessage() {
 }
 
 .character-badge {
-  padding: 2px 6px;
+  padding: 2rpx 6px;
   background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
   border-radius: 8px;
   color: #1a0f0a;
@@ -1871,16 +2117,16 @@ function sendChatMessage() {
 
 .player-hp {
   display: flex;
-  gap: 3px;
+  gap: 3rpx;
   justify-content: center;
-  margin-bottom: 4px;
+  margin-bottom: 4rpx;
 }
 
 .hp-dot {
-  width: 6px;
-  height: 6px;
+  width: 6rpx;
+  height: 6rpx;
   background: #333;
-  border: 1px solid #555;
+  border: 1rpx solid #555;
   border-radius: 50%;
 }
 
@@ -1903,7 +2149,7 @@ function sendChatMessage() {
   color: #f59e0b;
   font-size: 9px;
   text-align: center;
-  margin-top: 2px;
+  margin-top: 2rpx;
   font-weight: 600;
   line-height: 10px;
 }
@@ -1911,12 +2157,12 @@ function sendChatMessage() {
 .ai-tag,
 .dead-tag {
   position: absolute;
-  top: 2px;
-  right: 2px;
-  padding: 1px 4px;
+  top: 2rpx;
+  right: 2rpx;
+  padding: 1rpx 4rpx;
   background: rgba(60, 30, 30, 0.9);
-  border: 1px solid #5c2e2e;
-  border-radius: 3px;
+  border: 1rpx solid #5c2e2e;
+  border-radius: 3rpx;
   color: #d4a574;
   font-size: 9px;
   font-weight: 600;
@@ -1925,7 +2171,7 @@ function sendChatMessage() {
 
 .dead-tag {
   font-size: 12px;
-  padding: 1px 3px;
+  padding: 1rpx 3rpx;
 }
 
 /* 中心区域 */
@@ -1936,19 +2182,19 @@ function sendChatMessage() {
   align-items: center;
   justify-content: center;
   /* min-height: 80px; */
-  gap: 10px;
+  gap: 10rpx;
   transform: translateY(-10px);
 }
 
 .current-turn-banner {
   position: absolute;
-  top: 10px;
-  right: 20px;
-  padding: 8px 20px;
-  border-radius: 20px;
+  top: 10rpx;
+  right: 20rpx;
+  padding: 8rpx 20rpx;
+  border-radius: 20rpx;
   background: rgba(30, 10, 10, 0.95);
-  border: 2px solid #5c2e2e;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  border: 2rpx solid #5c2e2e;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.6);
   z-index: 50;
 }
 
@@ -1988,36 +2234,36 @@ function sendChatMessage() {
   text-align: center;
   padding: 3px 10px;
   background: rgba(30, 10, 10, 0.85);
-  border: 2px solid #5c2e2e;
-  border-radius: 6px;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
+  border: 2rpx solid #5c2e2e;
+  border-radius: 6rpx;
+  box-shadow: 0 3rpx 8rpx rgba(0, 0, 0, 0.5);
 }
 
 .last-play-info {
   display: block;
   color: #a08060;
   font-size: 11px;
-  margin-bottom: 6px;
+  margin-bottom: 6rpx;
   line-height: 11px;
 }
 
 .last-play-cards {
   display: flex;
-  gap: 6px;
+  gap: 6rpx;
   justify-content: center;
-  margin-bottom: 6px;
+  margin-bottom: 6rpx;
 }
 
 .play-card {
-  width: 30px;
-  height: 40px;
+  width: 24rpx;
+  height: 32rpx;
   background: linear-gradient(160deg, #f5e6d3 0%, #d6c0a9 100%);
-  border: 2px solid #8a6a4a;
-  border-radius: 4px;
+  border: 2rpx solid #8a6a4a;
+  border-radius: 4rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 3rpx 6rpx rgba(0, 0, 0, 0.4);
 }
 
 .card-text {
@@ -2057,12 +2303,13 @@ function sendChatMessage() {
 }
 
 .my-area {
+  margin-top: 2rpx;
   flex: 7;
   background: rgba(30, 10, 10, 0.9);
-  border: 2px solid #5c2e2e;
-  border-radius: 6px;
-  padding: 8px 8px 10px 8px;
-  box-shadow: 0 -3px 10px rgba(0, 0, 0, 0.5);
+  border: 2rpx solid #5c2e2e;
+  border-radius: 6rpx;
+  padding: 8rpx 8rpx 8rpx 8rpx;
+  box-shadow: 0 -3rpx 10rpx rgba(0, 0, 0, 0.5);
   flex-shrink: 0;
 }
 
@@ -2076,11 +2323,11 @@ function sendChatMessage() {
 }
 
 .my-avatar {
-  margin-left: 26rpx;
-  width: 28px;
-  /* height: 28px; */
+  margin-left: 28rpx;
+  /* width: 28rpx; */
+  /* height: 28rpx; */
   background: rgba(60, 30, 30, 0.6);
-  border: 1px solid #5a3a1e;
+  border: 1rpx solid #5a3a1e;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -2124,15 +2371,15 @@ function sendChatMessage() {
 }
 
 .top-btn {
-  width: 80px;
-  height: 32px;
+  width: 80rpx;
+  height: 28rpx;
   padding: 0;
-  font-size: 13px;
+  font-size: 13rpx;
   font-weight: 700;
-  border-radius: 4px;
+  border-radius: 4rpx;
   border: none;
   cursor: pointer;
-  line-height: 32px;
+  line-height: 32rpx;
   text-align: center;
   transition: all 0.2s;
   flex-shrink: 0;
@@ -2141,7 +2388,7 @@ function sendChatMessage() {
 .top-btn.play-btn {
   background: linear-gradient(180deg, #4ade80 0%, #22c55e 100%);
   color: #000;
-  box-shadow: 0 3px 8px rgba(74, 222, 128, 0.4);
+  box-shadow: 0 3rpx 8rpx rgba(74, 222, 128, 0.4);
 }
 
 .top-btn.play-btn[disabled] {
@@ -2155,7 +2402,7 @@ function sendChatMessage() {
 .top-btn.challenge-btn {
   background: linear-gradient(180deg, #e94560 0%, #dc2626 100%);
   color: #fff;
-  box-shadow: 0 3px 8px rgba(233, 69, 96, 0.4);
+  box-shadow: 0 3rpx 8rpx rgba(233, 69, 96, 0.4);
 }
 
 .top-btn.pass-btn {
@@ -2173,25 +2420,25 @@ function sendChatMessage() {
 .cards-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 8rpx;
 }
 
 .skill-btn-sidebar {
-  width: 80px;
-  height: 40px;
-  padding: 4px 8px;
+  width: 80rpx;
+  height: 40rpx;
+  padding: 4rpx 8rpx;
   display: flex;
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 6rpx;
   background: linear-gradient(180deg, #7a3e3e 0%, #5c2e2e 100%);
-  border: 2px solid #8a4e4e;
-  border-radius: 6px;
+  border: 2rpx solid #8a4e4e;
+  border-radius: 6rpx;
   cursor: pointer;
   flex-shrink: 0;
   transition: all 0.2s;
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 3rpx 6rpx rgba(0, 0, 0, 0.4);
 }
 
 .skill-btn-sidebar[disabled] {
@@ -2232,9 +2479,9 @@ function sendChatMessage() {
 
 .hand-cards-container {
   display: flex;
-  gap: 6px;
+  gap: 6rpx;
   overflow-x: auto;
-  padding-bottom: 2px;
+  padding-bottom: 2rpx;
   flex: 1;
   justify-content: center;
 }
@@ -2242,31 +2489,31 @@ function sendChatMessage() {
 /* 手牌 */
 .hand-cards {
   display: flex;
-  gap: 6px;
-  margin-bottom: 2px;
+  gap: 6rpx;
+  margin-bottom: 2rpx;
   overflow-x: auto;
-  padding-bottom: 2px;
+  padding-bottom: 2rpx;
 }
 
 .hand-card {
-  width: 48px;
-  height: 66px;
+  width: 30rpx;
+  height: 40rpx;
   background: linear-gradient(160deg, #f5e6d3 0%, #d6c0a9 100%);
-  border: 2px solid #8a6a4a;
-  border-radius: 6px;
+  border: 2rpx solid #8a6a4a;
+  border-radius: 6rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   transition: all 0.2s;
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 3rpx 6rpx rgba(0, 0, 0, 0.4);
   cursor: pointer;
 }
 
 .hand-card.selected {
-  transform: translateY(-8px);
+  transform: translateY(-8rpx);
   border-color: #4ade80;
-  box-shadow: 0 5px 12px rgba(74, 222, 128, 0.5);
+  box-shadow: 0 5rpx 12rpx rgba(74, 222, 128, 0.5);
 }
 
 .card-face {
@@ -2283,19 +2530,19 @@ function sendChatMessage() {
   color: #8a6a4a;
   padding: 16px;
   font-size: 12px;
-  height: 66px;
+  /* height: 66px; */
 }
 
 /* 操作按钮 - 高度24px */
 .action-buttons {
   display: flex;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 8rpx;
+  margin-top: 8rpx;
 }
 
 .action-btn {
   flex: 1;
-  padding: 6px 10px;
+  padding: 6rpx 10rpx;
   font-size: 12px;
   font-weight: 700;
   border-radius: 4px;
@@ -2308,7 +2555,7 @@ function sendChatMessage() {
 .play-btn {
   background: linear-gradient(180deg, #4ade80 0%, #22c55e 100%);
   color: #000;
-  box-shadow: 0 3px 8px rgba(74, 222, 128, 0.4);
+  box-shadow: 0 3rpx 8rpx rgba(74, 222, 128, 0.4);
 }
 
 .play-btn[disabled] {
@@ -2321,7 +2568,7 @@ function sendChatMessage() {
 .challenge-btn {
   background: linear-gradient(180deg, #e94560 0%, #dc2626 100%);
   color: #fff;
-  box-shadow: 0 3px 8px rgba(233, 69, 96, 0.4);
+  box-shadow: 0 3rpx 8rpx rgba(233, 69, 96, 0.4);
 }
 
 .pass-btn {
@@ -2669,5 +2916,295 @@ function sendChatMessage() {
   color: #f59e0b;
   font-size: 16px;
   font-weight: 600;
+}
+
+/* 气泡图标容器 */
+.bubble-container {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  z-index: 100;
+}
+
+/* 气泡图标 */
+.bubble-icon {
+  position: relative;
+  width: 50px;
+  height: 50px;
+  background: linear-gradient(135deg, #5a3a1e 0%, #3a2616 100%);
+  border: 2px solid #d4a574;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+  transition: all 0.2s;
+}
+
+.bubble-icon:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(212, 165, 116, 0.4);
+}
+
+.bubble-emoji {
+  font-size: 24px;
+}
+
+.bubble-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #1a0f0a;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* 聊天面板覆盖层（绝对定位） */
+.chat-panel-overlay {
+  position: fixed;
+  bottom: 10px;
+  right: 20px;
+  z-index: 300;
+}
+
+.chat-panel {
+  width: 320px;
+  height: 300px;
+  background: rgba(26, 15, 10, 0.98);
+  border: 2px solid #5a3a1e;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 日志面板覆盖层（绝对定位） */
+.log-panel-overlay {
+  position: fixed;
+  bottom: 10px;
+  right: 20px;
+  z-index: 300;
+}
+
+.log-panel {
+  width: 320px;
+  max-height: calc(100vh - 140px);
+  background: rgba(26, 15, 10, 0.98);
+  border: 2px solid #5a3a1e;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 面板头部 */
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #3a2616 0%, #2a1812 100%);
+  border-bottom: 1px solid #5a3a1e;
+  flex-shrink: 0;
+}
+
+.panel-title {
+  color: #d4a574;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.panel-close {
+  color: #a08060;
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color 0.2s;
+  padding: 0 4px;
+}
+
+.panel-close:hover {
+  color: #d4a574;
+}
+
+/* 聊天消息区域 */
+.chat-messages-area {
+  height: 180px;
+  padding: 12px;
+}
+
+.chat-messages-area::-webkit-scrollbar,
+.log-content-area::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-messages-area::-webkit-scrollbar-track,
+.log-content-area::-webkit-scrollbar-track {
+  background: rgba(42, 24, 18, 0.5);
+  border-radius: 3px;
+}
+
+.chat-messages-area::-webkit-scrollbar-thumb,
+.log-content-area::-webkit-scrollbar-thumb {
+  background: rgba(90, 58, 30, 0.8);
+  border-radius: 3px;
+}
+
+/* 聊天输入区域 */
+.chat-input-area {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(42, 24, 18, 0.6);
+  border-top: 1px solid #5a3a1e;
+  flex-shrink: 0;
+}
+
+.chat-input {
+  flex: 1;
+  height: 36px;
+  padding: 0 12px;
+  background: rgba(26, 15, 10, 0.8);
+  border: 1px solid #5a3a1e;
+  border-radius: 6px;
+  color: #c0b0a0;
+  font-size: 13px;
+}
+
+.chat-input::placeholder {
+  color: #5a3a1e;
+}
+
+.send-btn {
+  height: 36px;
+  padding: 0 16px;
+  background: linear-gradient(135deg, #7a3e3e 0%, #5c2e2e 100%);
+  border: 1px solid #8a4e4e;
+  border-radius: 6px;
+  color: #d4a574;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.send-btn:hover {
+  background: linear-gradient(135deg, #8a4e4e 0%, #6c3e3e 100%);
+  box-shadow: 0 2px 8px rgba(122, 62, 62, 0.4);
+}
+
+.send-btn:active {
+  transform: translateY(1px);
+}
+
+/* 日志内容区域 */
+.log-content-area {
+  height: 200px;
+  padding: 12px;
+}
+
+.empty-hint {
+  color: #5a3a1e;
+  font-size: 13px;
+  text-align: center;
+  margin-top: 40px;
+}
+
+/* 消息项 */
+.message-item {
+  margin-bottom: 8px;
+  padding: 8px;
+  background: rgba(42, 24, 18, 0.6);
+  border-radius: 6px;
+  border-left: 3px solid #5a3a1e;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+
+.msg-sender {
+  color: #d4a574;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.msg-text {
+  color: #c0b0a0;
+  font-size: 13px;
+  line-height: 1.4;
+  flex: 1;
+  word-break: break-word;
+}
+
+/* 日志项 */
+.log-item {
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  border-left: 3px solid #7a3e3e;
+}
+
+/* 不同类型日志的样式 */
+.log-type-round_start {
+  background: rgba(90, 58, 30, 0.5);
+  border-left-color: #d4a574;
+}
+
+.log-type-play_card {
+  background: rgba(42, 24, 18, 0.4);
+  border-left-color: #7a3e3e;
+}
+
+.log-type-challenge {
+  background: rgba(122, 62, 62, 0.4);
+  border-left-color: #f59e0b;
+}
+
+.log-type-no_challenge {
+  background: rgba(58, 38, 22, 0.4);
+  border-left-color: #5a3a1e;
+}
+
+.log-type-punishment {
+  background: rgba(92, 46, 46, 0.5);
+  border-left-color: #dc2626;
+}
+
+.log-type-elimination {
+  background: rgba(40, 20, 20, 0.6);
+  border-left-color: #991b1b;
+}
+
+.log-type-skill {
+  background: rgba(88, 28, 135, 0.3);
+  border-left-color: #a855f7;
+}
+
+.log-type-game_end {
+  background: rgba(90, 58, 30, 0.6);
+  border-left-color: #fbbf24;
+}
+
+.log-text {
+  display: block;
+  color: #a08060;
+  font-size: 12px;
+  line-height: 1.4;
 }
 </style>
