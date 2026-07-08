@@ -183,7 +183,7 @@
           <!-- 第二行：技能按钮（侧边栏）+ 手牌 -->
           <view class="cards-row">
             <!-- Foxy技能按钮 -->
-            <button v-if="canUseSkill" class="skill-btn-sidebar" :disabled="skillUsed" @tap="showSkillTargetSelect">
+            <button v-if="showSkillButton" class="skill-btn-sidebar" :disabled="!canUseSkill" @tap="showSkillTargetSelect">
               <view class="skill-icon">🔍</view>
               <text class="skill-label">{{ skillUsed ? '已用' : '偷看' }}</text>
             </button>
@@ -392,11 +392,21 @@ const myCharacter = computed(() => {
   return myPlayer.value?.character_id || ''
 })
 
+// 是否显示技能按钮（只要是Foxy就显示）
+const showSkillButton = computed(() => {
+  return myCharacter.value === 'foxy'
+})
+
+// 技能是否可用（需要满足所有条件）
 const canUseSkill = computed(() => {
   // 只有Foxy有主动技能
   if (myCharacter.value !== 'foxy') return false
-  // 游戏进行中且还没使用过
-  if (gameState.value?.phase !== 'PLAYING' && gameState.value?.phase !== 'CHALLENGE') return false
+  // 必须是游戏进行中（PLAYING阶段）
+  if (gameState.value?.phase !== 'PLAYING') return false
+  // 必须是自己的出牌回合
+  if (!isMyTurn.value) return false
+  // 还没使用过
+  if (skillUsed.value) return false
   return true
 })
 
@@ -874,7 +884,10 @@ function leaveRoom() {
       } catch (e) {
         console.error('Leave room error:', e)
       }
-      uni.navigateBack()
+      // 返回游戏大厅
+      uni.redirectTo({
+        url: '/pages/lobby/lobby'
+      })
     },
     onCancel: () => {
       confirmDialog.value.visible = false

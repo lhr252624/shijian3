@@ -29,18 +29,27 @@
 
     <!-- 右侧角色卡片区 -->
     <view class="characters-container">
-      <view v-for="char in characters" :key="char.id" class="character-card-wrapper"
+      <view v-for="(char, index) in characters" :key="char.id" class="character-card-wrapper"
         :class="{ selected: selectedCharacter === char.id }" @tap="selectCharacter(char.id)">
         <!-- 三层边框容器 -->
         <view class="card-border-base">
+          <!-- 外层底部棱角 -->
+          <view class="corner-bottom-left"></view>
+          <view class="corner-bottom-right"></view>
+
           <!-- 旋转边框层 -->
           <view class="card-border-rotating"></view>
           <!-- 内层容器 -->
           <view class="card-border-inner">
+            <!-- 内层底部棱角 -->
+            <view class="inner-corner-bottom-left"></view>
+            <view class="inner-corner-bottom-right"></view>
+
             <view class="character-card">
               <!-- 角色图片 -->
               <view class="character-avatar">
-                <image :src="char.image" mode="scaleToFill" />
+                <image :src="char.image" mode="aspectFill" :lazy-load="false" :show-menu-by-longpress="false"
+                  @error="handleImageError" @load="handleImageLoad" />
               </view>
 
               <!-- 角色信息 -->
@@ -82,28 +91,28 @@ const characters = ref([
     name: 'Scubby',
     description: '起手多一张万能牌',
     skill: '开局额外获得1张WILD牌，可以代替任何牌型',
-    image: '/static/tavern_characters_v01/assets/art/characters/scubby/scubby_idle_tavern_v01.png'
+    image: '../../static/tavern_characters_v01/assets/art/characters/scubby/scubby_idle_tavern_v01.png'
   },
   {
     id: 'foxy',
     name: 'Foxy',
     description: '可以偷看其他玩家手牌',
     skill: '每局游戏可使用一次偷看技能，查看目标玩家的所有手牌3秒',
-    image: '/static/tavern_characters_v01/assets/art/characters/foxy/foxy_idle_tavern_v01.png'
+    image: '../../static/tavern_characters_v01/assets/art/characters/foxy/foxy_idle_tavern_v01.png'
   },
   {
     id: 'bristle',
     name: 'Bristle',
     description: '每轮可以质疑两次',
     skill: '不受每轮一次质疑的限制，每轮可以质疑最多2次',
-    image: '/static/tavern_characters_v01/assets/art/characters/bristle/bristle_idle_tavern_v01.png'
+    image: '../../static/tavern_characters_v01/assets/art/characters/bristle/bristle_idle_tavern_v01.png'
   },
   {
     id: 'tor',
     name: 'Tor',
     description: '减少惩罚或免疫',
     skill: '失败惩罚时有50%概率减少1发子弹或完全免疫惩罚',
-    image: '/static/tavern_characters_v01/assets/art/characters/tor/tor_idle_tavern_v01.png'
+    image: '../../static/tavern_characters_v01/assets/art/characters/tor/tor_idle_tavern_v01.png'
   }
 ])
 
@@ -126,6 +135,14 @@ onActivated(() => {
 function selectCharacter(charId) {
   selectedCharacter.value = charId
   console.log('选择角色:', charId)
+}
+
+function handleImageError(e) {
+  console.error('图片加载失败:', e)
+}
+
+function handleImageLoad(e) {
+  console.log('图片加载成功:', e)
 }
 
 async function confirmAndMatch() {
@@ -381,7 +398,15 @@ function goBack() {
   transform: translateY(-12px) scale(1.02);
 }
 
-/* 三层边框容器 */
+.character-card-wrapper:hover {
+  transform: translateY(-8px) translateZ(0);
+}
+
+.character-card-wrapper.selected {
+  transform: translateY(-12px) scale(1.02) translateZ(0);
+}
+
+/* 第一层：底层容器（外边框） */
 .card-border-base {
   position: relative;
   width: 200px;
@@ -392,37 +417,57 @@ function goBack() {
   box-shadow:
     0 8px 24px rgba(0, 0, 0, 0.8),
     inset 0 2px 4px rgba(0, 0, 0, 0.6);
-
-  /* 使用线性切角代替clip-path */
   border: 2px solid transparent;
   background-clip: padding-box;
-  position: relative;
+  isolation: isolate;
+}
 
-  /* 创建切角效果 */
-  &::before,
-  &::after {
-    content: '';
-    position: absolute;
-    background: #1a0f0a;
-  }
+/* 外层容器的四个角棱角切割 */
+.card-border-base::before {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: #1a0f0a;
+  top: -2px;
+  left: -2px;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+  z-index: 100;
+}
 
-  /* 左上角切角 */
-  &::before {
-    top: 0;
-    left: 0;
-    width: 20px;
-    height: 20px;
-    clip-path: polygon(0 0, 100% 0, 0 100%);
-  }
+.card-border-base::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: #1a0f0a;
+  top: -2px;
+  right: -2px;
+  clip-path: polygon(100% 0, 100% 100%, 0 0);
+  z-index: 100;
+}
 
-  /* 右下角切角 */
-  &::after {
-    bottom: 0;
-    right: 0;
-    width: 20px;
-    height: 20px;
-    clip-path: polygon(100% 0, 100% 100%, 0 100%);
-  }
+/* 外层容器底部棱角 */
+.corner-bottom-left {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: #1a0f0a;
+  bottom: -2px;
+  left: -2px;
+  clip-path: polygon(0 100%, 100% 100%, 0 0);
+  z-index: 100;
+}
+
+.corner-bottom-right {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: #1a0f0a;
+  bottom: -2px;
+  right: -2px;
+  clip-path: polygon(100% 100%, 100% 0, 0 100%);
+  z-index: 100;
 }
 
 .character-card-wrapper.selected .card-border-base {
@@ -433,7 +478,7 @@ function goBack() {
     inset 0 2px 4px rgba(0, 0, 0, 0.6);
 }
 
-/* 旋转边框层 */
+/* 第二层：旋转容器（旋转边框效果） */
 .card-border-rotating {
   position: absolute;
   top: 50%;
@@ -455,7 +500,14 @@ function goBack() {
       transparent 60%,
       transparent 100%);
   animation: rotateInPlace 6s linear infinite;
-  will-change: transform;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* 禁用前两个卡片的动画，避免渲染问题 */
+.card-border-rotating.no-animate {
+  animation: none;
+  display: none;
 }
 
 @keyframes rotateInPlace {
@@ -487,7 +539,7 @@ function goBack() {
   animation: rotateInPlace 3s linear infinite;
 }
 
-/* 内层边框 */
+/* 第三层：展示容器（角色信息，层级最高） */
 .card-border-inner {
   position: relative;
   width: 100%;
@@ -495,35 +547,55 @@ function goBack() {
   padding: 3px;
   background: linear-gradient(135deg, #5a3a1e 0%, #3a2616 100%);
   box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.8);
-  z-index: 1;
-  overflow: hidden;
+  z-index: 10;
+}
 
-  /* 创建切角效果 */
-  &::before,
-  &::after {
-    content: '';
-    position: absolute;
-    background: inherit;
-    z-index: 2;
-  }
+/* 内层容器的四个角棱角 - 使用额外的view来实现 */
+.card-border-inner::before {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  background: linear-gradient(135deg, #1f1610 0%, #2a1c12 100%);
+  top: -1px;
+  left: -1px;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+  z-index: 101;
+}
 
-  /* 左上角切角 */
-  &::before {
-    top: 0;
-    left: 0;
-    width: 18px;
-    height: 18px;
-    clip-path: polygon(0 0, 100% 0, 0 100%);
-  }
+.card-border-inner::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  background: linear-gradient(135deg, #1f1610 0%, #2a1c12 100%);
+  top: -1px;
+  right: -1px;
+  clip-path: polygon(100% 0, 100% 100%, 0 0);
+  z-index: 101;
+}
 
-  /* 右下角切角 */
-  &::after {
-    bottom: 0;
-    right: 0;
-    width: 18px;
-    height: 18px;
-    clip-path: polygon(100% 0, 100% 100%, 0 100%);
-  }
+/* 内层容器底部棱角 */
+.inner-corner-bottom-left {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  background: linear-gradient(135deg, #1f1610 0%, #2a1c12 100%);
+  bottom: -1px;
+  left: -1px;
+  clip-path: polygon(0 100%, 100% 100%, 0 0);
+  z-index: 101;
+}
+
+.inner-corner-bottom-right {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  background: linear-gradient(135deg, #1f1610 0%, #2a1c12 100%);
+  bottom: -1px;
+  right: -1px;
+  clip-path: polygon(100% 100%, 100% 0, 0 100%);
+  z-index: 101;
 }
 
 .character-card-wrapper.selected .card-border-inner {
@@ -543,34 +615,10 @@ function goBack() {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  border-radius: 8px;
-
-  /* 创建切角效果 */
-  &::before,
-  &::after {
-    content: '';
-    position: absolute;
-    background: inherit;
-    z-index: 2;
-  }
-
-  /* 左上角切角 */
-  &::before {
-    top: 0;
-    left: 0;
-    width: 16px;
-    height: 16px;
-    clip-path: polygon(0 0, 100% 0, 0 100%);
-  }
-
-  /* 右下角切角 */
-  &::after {
-    bottom: 0;
-    right: 0;
-    width: 16px;
-    height: 16px;
-    clip-path: polygon(100% 0, 100% 100%, 0 100%);
-  }
+  clip-path: polygon(10px 0%, calc(100% - 10px) 0%,
+      100% 10px, 100% calc(100% - 10px),
+      calc(100% - 10px) 100%, 10px 100%,
+      0% calc(100% - 10px), 0% 10px);
 }
 
 .character-card-wrapper.selected .character-card {
@@ -589,8 +637,8 @@ function goBack() {
 
 .character-avatar image {
   width: 100%;
-  height: 200px;
-  object-fit: fill;
+  height: 100%;
+  display: block;
 }
 
 /* 角色信息 */
