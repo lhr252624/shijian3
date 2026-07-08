@@ -1064,9 +1064,14 @@ function playCards() {
     claim: gameState.value.target_card
   })
 
-  // 记录自己的出牌行动
+  // 记录自己的出牌行动到 actionLog
   const myName = myPlayer.value ? `P${myPlayer.value.seat_index + 1}-${authStore.user?.nickname || '我'}` : '我'
   addActionLog(`${myName} 出了 ${selectedCards.value.length} 张 ${gameState.value.target_card}`, 'play')
+
+  // 立即记录到游戏日志
+  if (myPlayer.value) {
+    addGameLog(`P${myPlayer.value.seat_index + 1} ${authStore.user?.nickname || '我'} 出了 ${selectedCards.value.length} 张 ${gameState.value.target_card}`, LogType.PLAY_CARD)
+  }
 
   resetSelection()
 }
@@ -1234,7 +1239,22 @@ function onGameState(payload) {
   }
   previousRound.value = payload.current_round
 
-  // 检测阶段变化：如果从CHALLENGE变为PLAYING，说明无人质疑
+  // 检测阶段变化
+  const phaseChanged = previousPhase.value !== payload.phase
+
+  // 1. 从 PLAYING → CHALLENGE: 说明有人出牌了
+  if (previousPhase.value === 'PLAYING' && payload.phase === 'CHALLENGE' && payload.last_play) {
+    const player = payload.players?.find(p => p.id === payload.last_play.player_id)
+    // 只记录他人出牌（自己的出牌已在 playCards() 中记录）
+    if (player && player.id !== myPlayerId.value) {
+      const playerName = getPlayerName(payload.last_play.player_id)
+      addActionLog(`${playerName} 出了 ${payload.last_play.count} 张 ${payload.last_play.claim}`, 'play')
+      addGameLog(`P${player.seat_index + 1} ${player.nickname} 出了 ${payload.last_play.count} 张 ${payload.last_play.claim}`, LogType.PLAY_CARD)
+    }
+    lastChallengePhase.value = true
+  }
+
+  // 2. 从 CHALLENGE → PLAYING: 说明无人质疑
   if (previousPhase.value === 'CHALLENGE' && payload.phase === 'PLAYING' && lastChallengePhase.value) {
     addGameLog(`✓ 无人质疑，游戏继续`, LogType.NO_CHALLENGE)
     lastChallengePhase.value = false
@@ -1242,9 +1262,6 @@ function onGameState(payload) {
 
   // 记录当前阶段
   previousPhase.value = payload.phase
-  if (payload.phase === 'CHALLENGE') {
-    lastChallengePhase.value = true
-  }
 
   // 更新游戏状态
   gameState.value = {
@@ -1261,22 +1278,6 @@ function onGameState(payload) {
       count: payload.last_play.count,
       claim: payload.last_play.claim
     } : null
-  }
-
-  // 记录上家出牌日志
-  if (payload.last_play) {
-    const playerName = getPlayerName(payload.last_play.player_id)
-    addActionLog(`${playerName} 出了 ${payload.last_play.count} 张 ${payload.last_play.claim}`, 'play')
-
-    // 添加日志：玩家出牌（去重检查）
-    const player = payload.players?.find(p => p.id === payload.last_play.player_id)
-    if (player) {
-      const playKey = `${payload.last_play.player_id}-${payload.current_turn}-${payload.last_play.count}-${payload.last_play.claim}`
-      if (lastPlayRecord.value !== playKey) {
-        addGameLog(`P${player.seat_index + 1} ${player.nickname} 出了 ${payload.last_play.count} 张 ${payload.last_play.claim}`, LogType.PLAY_CARD)
-        lastPlayRecord.value = playKey
-      }
-    }
   }
 
   // 找到当前操作的玩家
