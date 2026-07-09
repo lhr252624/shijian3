@@ -1,6 +1,6 @@
 # LIAR'S BAR 移动端
 
-《LIAR'S BAR》移动端基于 uni-app / Vue 3 开发，支持 H5 预览和 App 打包。项目包含登录注册、大厅、角色选择、匹配等待、房间加入、实时对局、开场 CG、背景音乐/音效、启动页和制作人员名单等功能。
+《LIAR'S BAR》移动端基于 uni-app / Vue 3 开发，支持 H5 预览和 App 打包。项目包含登录注册、大厅、角色选择、匹配等待、房间加入、实时对局、开场 CG、背景音乐/音效、启动页和制作人员名单等功能。安装包在tree/frontend/qizha/unpackage/release/apk/liar-1.0.4.apk
 
 ## 当前状态
 
