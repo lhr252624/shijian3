@@ -668,6 +668,33 @@ const getCharacterHeadImage = (characterId) => {
   return characterHeadImages[characterId] || ''
 }
 
+const getPlayerIdentity = (player = {}) => {
+  return String(player.id ?? player.user_id ?? player.player_id ?? '')
+}
+
+const getPlayerCharacterId = (player = {}) => {
+  return player.character_id ||
+    player.characterId ||
+    player.selected_character ||
+    player.selectedCharacter ||
+    player.character?.id ||
+    player.character?.character_id ||
+    ''
+}
+
+const normalizeRoomPlayers = (players = []) => {
+  const currentUserId = String(myPlayerId.value || '')
+  return players.map(player => {
+    const isCurrentUser = currentUserId && getPlayerIdentity(player) === currentUserId
+    const characterId = getPlayerCharacterId(player) || (isCurrentUser ? selectedCharacterId.value : '')
+
+    return {
+      ...player,
+      character_id: characterId
+    }
+  })
+}
+
 // 是否显示技能按钮（只要是Foxy就显示）
 const showSkillButton = computed(() => {
   return myCharacter.value === 'foxy'
@@ -733,7 +760,8 @@ const roomPlayers = computed(() => {
 })
 
 const myRoomPlayer = computed(() => {
-  const player = roomPlayers.value.find(p => p.id === myPlayerId.value || p.user_id === myPlayerId.value)
+  const currentUserId = String(myPlayerId.value || '')
+  const player = roomPlayers.value.find(p => getPlayerIdentity(p) === currentUserId)
   console.log('计算myRoomPlayer:', player, 'myPlayerId:', myPlayerId.value)
   return player
 })
@@ -1042,14 +1070,15 @@ async function loadRoomData() {
     if (res.code === 0 && res.data) {
       // 新API返回格式: { room: {...}, players: [...] }
       if (res.data.room) {
+        const players = normalizeRoomPlayers(res.data.players || [])
         roomState.value = {
           id: res.data.room.id,
           name: res.data.room.room_name,
           status: res.data.room.status,
           max_players: res.data.room.max_players || 4,
           player_count: res.data.room.current_players || 0,
-          players: res.data.players || [],
-          ready_count: (res.data.players || []).filter(p => p.is_ready).length
+          players,
+          ready_count: players.filter(p => p.is_ready).length
         }
         console.log('房间状态已设置:', roomState.value)
 
@@ -1367,6 +1396,7 @@ function leaveRoom() {
 // WebSocket 事件处理
 function onRoomState(payload) {
   console.log('ROOM_STATE:', payload)
+  const players = normalizeRoomPlayers(payload.players || [])
   // 更新房间状态（等待阶段）
   roomState.value = {
     id: payload.id,
@@ -1374,7 +1404,7 @@ function onRoomState(payload) {
     status: payload.phase || 'WAITING',
     max_players: payload.max_players || 4,
     player_count: payload.player_count || 0,
-    players: payload.players || [],
+    players,
     ready_count: payload.ready_count || 0
   }
   connecting.value = false
