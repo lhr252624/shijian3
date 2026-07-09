@@ -1,326 +1,228 @@
-# 骗子酒馆 - 移动端 (uni-app)
+# LIAR'S BAR 移动端
 
-这是《骗子酒馆》游戏的移动端实现,使用 uni-app 框架开发,支持 Android、iOS 和 H5。
+《LIAR'S BAR》移动端基于 uni-app / Vue 3 开发，支持 H5 预览和 App 打包。项目包含登录注册、大厅、角色选择、匹配等待、房间加入、实时对局、开场 CG、背景音乐/音效、启动页和制作人员名单等功能。
 
-## 项目特点
+## 当前状态
 
-- ✅ **完整迁移** - 从 Web 端完整迁移所有功能
-- ✅ **风格一致** - 保持与 Web 端完全一致的视觉风格和配色
-- ✅ **自定义组件** - 所有 UI 组件自行封装,不依赖 uni-ui
-- ✅ **横屏游戏** - 游戏房间页面支持横屏模式
-- ✅ **实时通信** - WebSocket 实时同步游戏状态
-- ✅ **动画特效** - 质疑结果、淘汰动画、屏幕震动等特效
+- 启动页展示武妖灵工作室 Logo，并淡出到登录页
+- 登录页支持横屏、美化登录面板和登录 BGM
+- 首次注册成功后自动登录，播放 CG，可跳过，结束后进入大厅
+- 大厅支持在线人数、创建房间、查看并加入房间、规则弹窗、设置弹窗
+- 设置弹窗包含主音量、背景音乐、音效三个音量控制，以及滚动制作人员名单
+- 角色选择支持 Scubby、Foxy、Bristle、Tor
+- 游戏房间支持角色头像、准备、出牌、质疑、过牌、技能、轮盘惩罚、淘汰、结算、聊天和行动日志
+- WebSocket 同步游戏状态，并带断线/重连相关处理
 
 ## 技术栈
 
-- **框架**: uni-app (Vue 3 + Composition API)
-- **状态管理**: Pinia
-- **网络请求**: uni.request (封装)
-- **实时通信**: WebSocket
-- **样式**: CSS3 + 动画
-
-## 项目结构
-
-```
-qizha/
-├── pages/                  # 页面
-│   ├── login/             # 登录页
-│   ├── register/          # 注册页
-│   ├── lobby/             # 大厅页
-│   ├── match-wait/        # 匹配等待页
-│   ├── game-room/         # 游戏房间页 (核心)
-│   ├── profile/           # 个人中心
-│   └── history/           # 历史战绩
-├── components/            # 自定义组件
-│   ├── Toast.vue         # 提示框组件
-│   ├── Modal.vue         # 弹窗组件
-│   ├── Loading.vue       # 加载组件
-│   └── RulesModal.vue    # 规则弹窗组件
-├── stores/               # 状态管理
-│   ├── auth.js          # 认证状态
-│   └── game.js          # 游戏状态
-├── utils/               # 工具类
-│   ├── api.js          # API 请求封装
-│   └── websocket.js    # WebSocket 客户端
-├── styles/             # 全局样式
-│   └── global.css
-├── static/             # 静态资源
-│   └── images/
-├── App.vue
-├── main.js
-├── pages.json          # 页面配置
-├── manifest.json       # 应用配置
-└── package.json
-```
+- uni-app
+- Vue 3
+- Pinia
+- WebSocket
+- Sass
+- HBuilderX / DCloud App 打包
 
 ## 快速开始
 
-### 1. 安装依赖
+安装依赖：
 
 ```bash
 npm install
 ```
 
-### 2. 配置后端地址
+H5 开发：
 
-修改 `utils/api.js` 和 `utils/websocket.js` 中的 API 地址:
-
-```javascript
-// utils/api.js
-const BASE_URL = 'http://your-api-domain.com/api/v1'
-
-// utils/websocket.js
-this.url = `ws://your-api-domain.com/ws?token=${encodeURIComponent(token)}`
-```
-
-### 3. 运行项目
-
-#### H5 开发模式
 ```bash
 npm run dev:h5
 ```
 
-#### 微信小程序
-```bash
-npm run dev:mp-weixin
-```
+H5 构建：
 
-#### App (需要 HBuilderX)
-```bash
-npm run dev:app
-```
-
-### 4. 打包发布
-
-#### H5 打包
 ```bash
 npm run build:h5
 ```
 
-#### App 打包
-使用 HBuilderX 打开项目,选择"发行" -> "原生 App-云打包"
+App 构建：
 
-## 核心功能说明
-
-### 1. 登录注册系统
-- JWT Token 认证
-- 自动持久化登录状态
-- 友好的错误提示
-
-### 2. 大厅系统
-- 实时显示在线人数、活跃房间
-- 快速匹配功能
-- 创建/加入房间
-- 5秒轮询刷新数据
-
-### 3. 游戏房间 (最复杂)
-- **横屏模式** - 游戏时自动切换横屏
-- **实时同步** - WebSocket 实时同步游戏状态
-- **游戏逻辑**:
-  - 手牌选择 (1-3张)
-  - 出牌、质疑、过牌操作
-  - 俄罗斯轮盘惩罚机制
-- **动画特效**:
-  - 质疑成功/失败特效
-  - 玩家淘汰动画
-  - 屏幕震动反馈
-  - 卡牌翻转动画
-- **UI 元素**:
-  - 对手状态卡片
-  - 回合指示器
-  - 手牌展示
-  - 操作按钮
-
-### 4. 其他功能
-- 个人中心 (查看战绩、修改昵称)
-- 历史记录
-- 规则说明
-
-## 自定义组件
-
-所有 UI 组件都是自行封装,不依赖第三方库:
-
-### Toast (提示框)
-```vue
-<Toast
-  v-model:visible="toast.show"
-  :message="toast.msg"
-  :type="toast.type"  // error | success | info
-  :duration="3000"
-/>
+```bash
+npm run build:app
 ```
 
-### Modal (弹窗)
-```vue
-<Modal
-  v-model:visible="showModal"
-  title="标题"
-  :show-footer="true"
-  @confirm="handleConfirm"
-  @cancel="handleCancel"
->
-  <view>弹窗内容</view>
-</Modal>
+App 真机运行或云打包建议使用 HBuilderX 打开项目。
+
+## 项目结构
+
+```text
+qizha/
+├── App.vue
+├── main.js
+├── manifest.json
+├── pages.json
+├── package.json
+├── components/
+│   ├── ConfirmDialog.vue
+│   ├── InputDialog.vue
+│   ├── Loading.vue
+│   ├── Modal.vue
+│   ├── RulesModal.vue
+│   └── Toast.vue
+├── pages/
+│   ├── studio-splash/      # 游戏启动展示页
+│   ├── login/              # 登录页
+│   ├── register/           # 注册页
+│   ├── cg/                 # 注册后的开场 CG
+│   ├── lobby/              # 大厅、规则、设置、房间列表
+│   ├── character-select/   # 角色选择
+│   ├── match-wait/         # 匹配等待
+│   ├── game-room/          # 游戏房间
+│   ├── profile/            # 个人中心
+│   └── history/            # 历史战绩
+├── stores/
+│   ├── auth.js
+│   └── game.js
+├── utils/
+│   ├── api.js
+│   ├── audio.js
+│   └── websocket.js
+└── static/
+    ├── images/
+    ├── sounds/
+    ├── tavern_characters_v01/
+    └── videos/
 ```
 
-### Loading (加载)
-```vue
-<Loading :visible="loading" text="加载中..." />
+## 页面流程
+
+1. `pages/studio-splash/studio-splash`
+   展示 `static/images/studio_splash_wuyaoling_510.png`，淡出黑场后进入登录页。
+
+2. `pages/login/login`
+   登录入口，进入页面播放 `login_music.mp3`。H5 首次进入时可能受浏览器自动播放策略影响，页面交互后会再次触发播放。
+
+3. `pages/register/register`
+   注册成功后自动登录，并进入开场 CG。
+
+4. `pages/cg/cg`
+   播放 `static/videos/cg.mp4`，支持跳过，播放结束进入大厅。
+
+5. `pages/lobby/lobby`
+   游戏大厅，包含创建房间、查看房间、规则、设置、用户中心、退出登录。
+
+6. `pages/character-select/character-select`
+   选择角色后进入匹配。
+
+7. `pages/match-wait/match-wait`
+   等待匹配结果，匹配成功进入游戏房间。
+
+8. `pages/game-room/game-room`
+   核心对局页面，负责等待房间、准备、游戏状态渲染、玩家操作和 WebSocket 事件处理。
+
+## 静态资源
+
+### 图片
+
+- `static/images/icon_demo.png`：应用图标原图
+- `static/images/app-icons/`：由图标原图生成的多尺寸 App 图标
+- `static/images/studio_splash_wuyaoling_510.png`：启动页展示图
+- `static/images/login.png`：登录背景
+- `static/images/register.png`：注册背景
+- `static/tavern_characters_v01/assets/art/characters/*/*_head.png`：角色头像
+
+### 视频
+
+- `static/videos/cg.mp4`：首次注册成功后的开场 CG
+
+### 音频
+
+BGM：
+
+- `static/sounds/bgm/login_music.mp3`
+- `static/sounds/bgm/lobby_music.mp3`
+- `static/sounds/bgm/playing_music.mp3`
+
+音效：
+
+- `static/sounds/sound_effect/UI/button.mp3`
+- `static/sounds/sound_effect/game/block.mp3`
+- `static/sounds/sound_effect/game/death.mp3`
+- `static/sounds/sound_effect/game/fire.mp3`
+- `static/sounds/sound_effect/game/skill.mp3`
+- `static/sounds/sound_effect/game/suspect.mp3`
+- `static/sounds/sound_effect/game/win.mp3`
+- `static/sounds/sound_effect/room/entry_game_2.mp3`
+- `static/sounds/sound_effect/room/exit.mp3`
+- `static/sounds/sound_effect/room/match_success.mp3`
+
+音频播放、音量存储和音效映射集中在 `utils/audio.js`。
+
+## 配置说明
+
+### 后端地址
+
+API 和 WebSocket 地址在以下文件中维护：
+
+- `utils/api.js`
+- `utils/websocket.js`
+
+开发或部署到不同环境时，需要确认后端 HTTP 和 WebSocket 地址可访问。
+
+### 页面配置
+
+页面路由和横屏配置位于 `pages.json`。当前启动页排在第一位，因此 App/H5 启动后会先展示工作室启动页。
+
+### App 配置
+
+`manifest.json` 中配置了：
+
+- App 基础信息
+- 横屏和全屏相关配置
+- App 图标
+- Android 权限
+- App Plus splashscreen
+
+## 音量设置
+
+设置入口在大厅右上角。设置项包括：
+
+- 主音量
+- 背景音乐
+- 音效
+
+设置通过 `uni.setStorageSync` 持久化，下次进入仍然生效。
+
+## 制作人员名单
+
+大厅设置弹窗内包含滚动制作人员名单：
+
+- 武妖灵工作室
+- 项目统筹
+- 视频与文档组
+- 音频制作
+- 程序开发
+- 全体测试人员
+- 版权信息
+
+## 构建验证
+
+最近一次验证命令：
+
+```bash
+npm run build:h5
+npm run build:app
 ```
 
-### RulesModal (规则说明)
-```vue
-<RulesModal v-model:visible="showRules" />
-```
+两项均可通过。构建时可能出现 Sass deprecation warning，这是依赖链的弃用提示，不影响当前功能。
 
-## 适配说明
+## Git 注意事项
 
-### 横屏适配
-游戏房间页面在 `pages.json` 中配置了横屏:
-```json
-{
-  "path": "pages/game-room/game-room",
-  "style": {
-    "pageOrientation": "landscape"
-  }
-}
-```
+仓库已通过 `.gitignore` 排除：
 
-在页面中通过 App Plus API 锁定横屏:
-```javascript
-// 锁定横屏
-plus.screen.lockOrientation('landscape-primary')
+- `node_modules/`
+- `dist/`
+- `.DS_Store`
 
-// 解除锁定
-plus.screen.lockOrientation('portrait-primary')
-```
+提交时应只提交源码、配置和必要的静态资源，不要提交本地依赖目录或构建产物。
 
-### 安全区域适配
-已添加安全区域适配类:
-```css
-.safe-area-inset-top { padding-top: env(safe-area-inset-top); }
-.safe-area-inset-bottom { padding-bottom: env(safe-area-inset-bottom); }
-.safe-area-inset-left { padding-left: env(safe-area-inset-left); }
-.safe-area-inset-right { padding-right: env(safe-area-inset-right); }
-```
+## 版权
 
-### rpx 单位
-所有尺寸使用 rpx 单位,自动适配不同屏幕尺寸。
-
-## 注意事项
-
-1. **API 地址配置**
-   - 开发时需要配置正确的后端 API 地址
-   - H5 模式可以使用 Vite 代理
-   - App 模式需要使用实际的 IP 或域名
-
-2. **WebSocket 连接**
-   - Android 真机需要使用 `ws://` 或 `wss://` 协议
-   - 确保后端支持 WebSocket 连接
-   - 已实现自动重连机制
-
-3. **权限配置**
-   - `manifest.json` 中已配置必要的权限
-   - 震动权限 (VIBRATE)
-   - 网络权限 (INTERNET, ACCESS_NETWORK_STATE)
-
-4. **横屏锁定**
-   - 仅在游戏房间页面启用横屏
-   - 离开页面时自动恢复竖屏
-   - H5 模式下横屏锁定不生效,仅 App 有效
-
-5. **性能优化**
-   - 聊天记录限制最多保留 100 条
-   - 轮询数据使用 5 秒间隔
-   - WebSocket 心跳保持连接
-
-## 与 Web 端的区别
-
-| 功能 | Web 端 | 移动端 |
-|------|--------|--------|
-| 路由 | vue-router | uni-app 页面跳转 |
-| HTTP | axios | uni.request |
-| WebSocket | 原生 WebSocket | uni.connectSocket |
-| 存储 | localStorage | uni.getStorageSync |
-| 弹窗 | 自定义组件 | uni.showModal + 自定义组件 |
-| 屏幕方向 | 浏览器控制 | plus.screen API |
-| 震动反馈 | navigator.vibrate | uni.vibrateShort/Long |
-
-## 横屏适配完成情况
-
-### ✅ 已完成横屏适配的页面
-
-1. **登录页 (login)** - 完成横屏锁定
-2. **注册页 (register)** - 完成横屏锁定
-3. **大厅页 (lobby)** - 完成横屏锁定
-4. **匹配等待页 (match-wait)** - 完成横屏锁定
-5. **游戏房间页 (game-room)** - 完成横屏锁定，包含完整游戏逻辑
-
-### ❌ 未完成横屏适配的页面
-
-1. **创建房间 ()** - 未添加横屏适配
-2. **查看房价 ()** - 未添加横屏适配
-
-### 🚧 功能完成情况
-
-#### 已完成功能
-
-- ✅ 登录/注册系统
-- ✅ 大厅系统（在线人数、快速匹配）
-- ✅ 匹配等待页面
-- ✅ 游戏房间核心逻辑（出牌、质疑、俄罗斯轮盘）
-- ✅ 游戏动画特效（质疑结果、淘汰动画、震动反馈）
-- ✅ WebSocket 实时通信
-- ✅ 规则说明弹窗
-
-#### 未完成功能
-
-- ❌ 创建房间功能（UI 已存在，功能未实现）
-- ❌ 查看房间功能（UI 已存在，功能未实现）
-- ❌ 设置页面（按钮已存在，页面未创建）
-- ❌ 退出确认弹窗（使用原生 uni.showModal，未使用自定义 Modal 组件）
-- ❌ 个人中心和历史战绩的横屏适配
-- ❌ 聊天功能（接口已保留，UI 未实现）
-
-## 待完善功能
-
-### 核心功能
-
-- [ ] 创建房间功能实现
-- [ ] 查看房间列表功能实现
-- [ ] 设置页面（音效开关、震动开关等）
-- [ ] 退出确认弹窗改为自定义 Modal 组件
-- [ ] 个人中心和历史战绩页面横屏适配
-
-### 增强功能
-
-- [ ] 聊天功能 UI 实现
-- [ ] 背景音乐和音效
-- [ ] 更多动画细节优化
-- [ ] 离线模式支持
-- [ ] 多语言支持
-
-## 常见问题
-
-### Q: 运行报错 "pinia is not defined"
-A: 确保已安装 pinia: `npm install pinia`
-
-### Q: WebSocket 连接失败
-A: 检查后端 WebSocket 地址是否正确,Android 真机需要使用实际 IP 地址
-
-### Q: 横屏不生效
-A: 横屏锁定仅在 App 模式下有效,H5 模式不支持
-
-### Q: 样式显示异常
-A: 检查是否正确使用 rpx 单位,避免使用 px
-
-## 开发建议
-
-1. 使用 HBuilderX 开发体验更好
-2. 真机调试使用 `console.log` 配合 HBuilderX 控制台
-3. 频繁修改建议使用 H5 模式开发,速度更快
-4. 最终测试务必在真机上进行
-
-## 许可证
-
-本项目仅供学习交流使用。
+©2026 武妖灵工作室 保留所有权利。
