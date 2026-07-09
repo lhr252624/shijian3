@@ -340,6 +340,13 @@ onActivated(() => {
 onShow(() => {
   console.log('=== 大厅页面 onShow ===')
   playBgm('lobby')
+
+  // 检查 WebSocket 连接状态,如果未连接则重连
+  if (!wsClient.connected) {
+    console.log('WebSocket 未连接,尝试重连...')
+    wsClient.connect()
+  }
+
   fetchLobby()
   // 如果房间列表正在显示，也刷新房间列表
   if (showRoomList.value) {

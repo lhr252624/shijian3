@@ -12,6 +12,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, onActivated } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import { matchAPI } from '../../utils/api'
 import { playBgm, playSfx } from '../../utils/audio'
 import wsClient from '../../utils/websocket'
@@ -63,6 +64,17 @@ onMounted(() => {
 onActivated(() => {
   setLandscape()
   playBgm('lobby')
+})
+
+// 页面显示时检查 WebSocket 连接
+onShow(() => {
+  console.log('=== 匹配等待页面 onShow ===')
+
+  // 检查 WebSocket 连接状态,如果未连接则重连
+  if (!wsClient.connected) {
+    console.log('WebSocket 未连接,尝试重连...')
+    wsClient.connect()
+  }
 })
 
 onUnmounted(() => {
