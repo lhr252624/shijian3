@@ -81,6 +81,7 @@ const forceRenderKey = ref(0)
 const enableAnimations = ref(false)
 const pageMode = ref('match')
 const pendingRoomName = ref('')
+const pendingRoomId = ref('')
 
 // 角色数据
 const characters = ref([
@@ -125,6 +126,7 @@ function setLandscape() {
 onLoad((options = {}) => {
   pageMode.value = options.mode || 'match'
   pendingRoomName.value = decodeURIComponent(options.roomName || '')
+  pendingRoomId.value = decodeURIComponent(options.roomId || '')
 })
 
 onMounted(() => {
@@ -219,6 +221,18 @@ async function confirmAndMatch() {
       return
     }
 
+    if (pageMode.value === 'join-room') {
+      if (!pendingRoomId.value) {
+        throw new Error('加入房间缺少房间ID')
+      }
+
+      await roomAPI.join(pendingRoomId.value, selectedCharacter.value)
+      uni.redirectTo({
+        url: `/pages/game-room/game-room?id=${encodeURIComponent(pendingRoomId.value)}&character_id=${encodeURIComponent(selectedCharacter.value)}`
+      })
+      return
+    }
+
     const result = await matchAPI.start({ character_id: selectedCharacter.value })
     console.log('匹配API返回结果:', result)
 
@@ -228,7 +242,11 @@ async function confirmAndMatch() {
   } catch (e) {
     console.error('确认角色失败:', e)
     uni.showToast({
-      title: pageMode.value === 'create-room' ? '创建房间失败，请重试' : '匹配失败，请重试',
+      title: pageMode.value === 'create-room'
+        ? '创建房间失败，请重试'
+        : pageMode.value === 'join-room'
+          ? '加入房间失败，请重试'
+          : '匹配失败，请重试',
       icon: 'none'
     })
   } finally {

@@ -149,10 +149,13 @@ export const roomAPI = {
       method: "GET",
     }),
 
-  join: (id) =>
+  join: (id, characterId) =>
     request({
       url: `/rooms/${id}/join`,
       method: "POST",
+      data: {
+        ...(characterId ? { character_id: characterId } : {}),
+      },
     }),
 
   leave: (id) =>

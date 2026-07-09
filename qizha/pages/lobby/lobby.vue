@@ -609,22 +609,16 @@ async function handleJoinRoom(room) {
   playSfx('uiClick')
   if (!canJoinRoom(room)) return
 
-  loading.value = true
-  try {
-    const roomId = room.id || room.room_id
-    await roomAPI.join(roomId)
-    showToast('加入房间成功', 'success')
-    // 停止轮询
-    stopRoomPolling()
-    // 跳转到房间页面
-    uni.navigateTo({
-      url: `/pages/game-room/game-room?id=${roomId}`
-    })
-  } catch (e) {
-    showToast(e.response?.data?.msg || '加入房间失败', 'error')
-  } finally {
-    loading.value = false
+  const roomId = room.id || room.room_id
+  if (!roomId) {
+    showToast('房间ID无效', 'error')
+    return
   }
+
+  stopRoomPolling()
+  uni.navigateTo({
+    url: `/pages/character-select/character-select?mode=join-room&roomId=${encodeURIComponent(roomId)}`
+  })
 }
 </script>
 
