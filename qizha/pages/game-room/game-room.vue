@@ -32,7 +32,8 @@
         <text class="target-badge">目标牌: {{ gameState?.target_card || '-' }}</text>
       </view>
       <view class="alive-count">{{ gameState?.alive_count || 4 }} 人存活</view>
-      <button class="rules-btn" @tap="showRules = true">📖</button>
+      <button class="top-icon-btn" @tap="goSettings">⚙</button>
+      <button class="top-icon-btn rules-btn" @tap="showRules = true">📖</button>
     </view>
 
     <!-- 游戏结束遮罩 -->
@@ -354,6 +355,66 @@
       </view>
     </view>
 
+    <!-- 设置模态框 -->
+    <view v-if="showSettings" class="settings-overlay" @click.self="closeSettings">
+      <view class="settings-modal">
+        <view class="settings-header">
+          <text class="settings-title">设置</text>
+          <view class="settings-close" @click="closeSettings">×</view>
+        </view>
+
+        <view class="settings-content">
+          <view class="volume-panel">
+            <text class="settings-section-title">音量设置</text>
+            <view v-for="item in volumeItems" :key="item.key" class="volume-row">
+              <view class="volume-info">
+                <text class="volume-label">{{ item.label }}</text>
+                <text class="volume-value">{{ audioSettings[item.key] }}%</text>
+              </view>
+              <slider class="volume-slider" :value="audioSettings[item.key]" min="0" max="100" block-size="20"
+                activeColor="#d4a574" backgroundColor="#3a2616" @changing="updateVolume(item.key, $event)"
+                @change="updateVolume(item.key, $event)" />
+            </view>
+          </view>
+
+          <view class="credits-panel">
+            <text class="settings-section-title">制作人员名单</text>
+            <view class="credits-viewport">
+              <view class="credits-scroll">
+                <text class="credits-main-title">《LIAR'S BAR》制作人员名单</text>
+                <text class="credits-studio">武妖灵工作室</text>
+
+                <text class="credits-group">项目统筹</text>
+                <text class="credits-line">项目经理：李汶洋</text>
+                <text class="credits-duty">工作职责：项目管理、游戏策划、服务端开发、美术制作、台词配音</text>
+
+                <text class="credits-group">视频与文档组</text>
+                <text class="credits-line">剪辑、文档管理：游翔宇</text>
+                <text class="credits-line">文档管理：陆鑫涛</text>
+
+                <text class="credits-group">音频制作</text>
+                <text class="credits-line">BGM 作曲、音效制作：朱昱丞</text>
+
+                <text class="credits-group">程序开发</text>
+                <text class="credits-line">服务端开发：李汶洋、吴子轩</text>
+                <text class="credits-line">客户端开发：李昊燃</text>
+
+                <text class="credits-group">全体测试人员</text>
+                <text class="credits-line">李汶洋、游翔宇、陆鑫涛、朱昱丞、吴子轩、李昊燃</text>
+
+                <text class="credits-group">版权信息</text>
+                <text class="credits-line">©2026 武妖灵工作室 保留所有权利</text>
+
+                <view class="credits-spacer"></view>
+                <text class="credits-main-title">《LIAR'S BAR》制作人员名单</text>
+                <text class="credits-studio">武妖灵工作室</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
     <!-- 规则弹窗 -->
     <RulesModal v-model:visible="showRules" />
 
@@ -409,7 +470,7 @@ import { onLoad } from '@dcloudio/uni-app'
 import { useAuthStore } from '../../stores/auth'
 import { useGameStore } from '../../stores/game'
 import { roomAPI } from '../../utils/api'
-import { playBgm, playSfx } from '../../utils/audio'
+import { getAudioSettings, playBgm, playSfx, setAudioSetting } from '../../utils/audio'
 import wsClient from '../../utils/websocket'
 import Toast from '../../components/Toast.vue'
 import RulesModal from '../../components/RulesModal.vue'
@@ -424,6 +485,7 @@ const pageOptions = ref(null)
 const gameState = ref(null)
 const roomState = ref(null)
 const showRules = ref(false)
+const showSettings = ref(false)
 const toast = ref({ show: false, msg: '', type: 'error' })
 const selectedCards = ref([])
 const shakeScreen = ref(false)
@@ -439,6 +501,12 @@ const logExpanded = ref(false)
 const chatText = ref('')
 const chatScrollIntoView = ref('')
 const logScrollIntoView = ref('')
+const audioSettings = ref(getAudioSettings())
+const volumeItems = [
+  { key: 'master', label: '主音量' },
+  { key: 'bgm', label: '背景音乐' },
+  { key: 'sfx', label: '音效' }
+]
 
 // 追踪上一次的游戏阶段，用于检测无人质疑
 const previousPhase = ref(null)
@@ -1648,6 +1716,22 @@ function toggleLogPanel() {
   console.log('日志面板状态:', logExpanded.value ? '打开' : '关闭')
 }
 
+function goSettings() {
+  playSfx('uiClick')
+  audioSettings.value = getAudioSettings()
+  showSettings.value = true
+}
+
+function closeSettings() {
+  playSfx('uiClick')
+  showSettings.value = false
+}
+
+function updateVolume(key, event) {
+  const value = event.detail?.value ?? event.target?.value ?? 0
+  audioSettings.value = setAudioSetting(key, value)
+}
+
 // 发送聊天消息（气泡面板使用）
 function sendChatMessage() {
   if (!chatText.value.trim()) {
@@ -2118,8 +2202,7 @@ function sendChatMessage() {
   line-height: 12px;
 }
 
-.rules-btn {
-  margin-right: 40rpx;
+.top-icon-btn {
   padding: 10rpx 10rpx;
   background: rgba(60, 30, 30, 0.8);
   border: 1rpx solid #5c2e2e;
@@ -2131,9 +2214,223 @@ function sendChatMessage() {
   transition: all 0.2s;
 }
 
-.rules-btn:active {
+.rules-btn {
+  margin-right: 40rpx;
+}
+
+.top-icon-btn:active {
   background: rgba(80, 40, 40, 0.9);
   transform: scale(0.95);
+}
+
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.settings-modal {
+  width: 760px;
+  max-width: 88vw;
+  max-height: 86vh;
+  background: linear-gradient(160deg, #1f1610 0%, #2a1c12 100%);
+  border: 3px solid #5a3a1e;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.88), inset 0 1px 0 rgba(212, 165, 116, 0.12);
+  overflow: hidden;
+}
+
+.settings-header {
+  height: 54px;
+  padding: 0 18px 0 22px;
+  border-bottom: 2px solid #3a2616;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-title {
+  color: #d4a574;
+  font-size: 20px;
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.settings-close {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8a6a4a;
+  font-size: 32px;
+  line-height: 1;
+}
+
+.settings-close:active {
+  color: #d4a574;
+  transform: scale(0.95);
+}
+
+.settings-content {
+  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: row;
+  gap: 24px;
+}
+
+.volume-panel,
+.credits-panel {
+  min-width: 0;
+}
+
+.volume-panel {
+  width: 300px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.credits-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-section-title {
+  color: #d4a574;
+  font-size: 17px;
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.55);
+}
+
+.volume-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.volume-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.volume-label {
+  color: #c9a875;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.volume-value {
+  color: #d94f3d;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.volume-slider {
+  margin: 0;
+}
+
+.credits-viewport {
+  position: relative;
+  height: 285px;
+  overflow: hidden;
+  background: rgba(10, 6, 4, 0.5);
+  border: 1px solid rgba(90, 58, 30, 0.8);
+  border-radius: 8px;
+  box-shadow: inset 0 8px 18px rgba(0, 0, 0, 0.45);
+}
+
+.credits-viewport::before,
+.credits-viewport::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 54px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.credits-viewport::before {
+  top: 0;
+  background: linear-gradient(180deg, rgba(10, 6, 4, 0.98) 0%, rgba(10, 6, 4, 0) 100%);
+}
+
+.credits-viewport::after {
+  bottom: 0;
+  background: linear-gradient(0deg, rgba(10, 6, 4, 0.98) 0%, rgba(10, 6, 4, 0) 100%);
+}
+
+.credits-scroll {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  top: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  animation: credits-roll 28s linear infinite;
+}
+
+.credits-main-title {
+  color: #f1d5a8;
+  font-size: 17px;
+  font-weight: 800;
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.credits-studio {
+  color: #d4a574;
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.credits-group {
+  color: #d94f3d;
+  font-size: 15px;
+  font-weight: 700;
+  text-align: center;
+  margin-top: 10px;
+}
+
+.credits-line,
+.credits-duty {
+  color: #d8c0a0;
+  font-size: 13px;
+  line-height: 1.55;
+  text-align: center;
+}
+
+.credits-duty {
+  max-width: 330px;
+  color: #b89470;
+}
+
+.credits-spacer {
+  height: 72px;
+  flex-shrink: 0;
+}
+
+@keyframes credits-roll {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(-660px);
+  }
 }
 
 /* 游戏结束遮罩 */

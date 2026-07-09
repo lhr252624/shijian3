@@ -33,8 +33,15 @@ const SFX_TRACKS = {
   chat: '/static/sounds/sound_effect/UI/button.mp3'
 }
 
+const SFX_GAIN = {
+  challenge: 1.35,
+  challengeSuccess: 1.35,
+  challengeFail: 1.35
+}
+
 let currentBgm = null
 let currentBgmName = ''
+let desiredBgmName = ''
 const activeSfxContexts = new Set()
 
 function clampVolume(value) {
@@ -69,10 +76,52 @@ function calculateVolume(kind) {
   return (settings.master / 100) * (channel / 100)
 }
 
+function calculateSfxVolume(name) {
+  return Math.min(1, calculateVolume('sfx') * (SFX_GAIN[name] || 1))
+}
+
 function applyBgmVolume() {
   if (currentBgm) {
     currentBgm.volume = calculateVolume('bgm')
   }
+}
+
+function applyAudioContextDefaults(audio) {
+  try {
+    audio.autoplay = false
+  } catch (error) {
+    console.warn('设置音频 autoplay 失败:', error)
+  }
+
+  try {
+    audio.sessionCategory = 'ambient'
+  } catch (error) {
+    // 旧版运行时或部分端可能不支持该属性，忽略即可。
+  }
+
+  try {
+    audio.obeyMuteSwitch = false
+  } catch (error) {
+    // Android 部分运行时这个属性是只读 getter，不能直接赋值。
+  }
+}
+
+function stopBgmContext(clearDesired = true) {
+  if (!currentBgm) {
+    if (clearDesired) desiredBgmName = ''
+    return
+  }
+
+  try {
+    currentBgm.stop()
+    currentBgm.destroy()
+  } catch (error) {
+    console.warn('停止背景音乐失败:', error)
+  }
+
+  currentBgm = null
+  currentBgmName = ''
+  if (clearDesired) desiredBgmName = ''
 }
 
 export function getAudioSettings() {
@@ -112,19 +161,21 @@ export function playBgm(name) {
   const src = BGM_TRACKS[name]
   if (!src) return
 
+  desiredBgmName = name
+
   if (currentBgm && currentBgmName === name) {
     applyBgmVolume()
     currentBgm.play()
     return
   }
 
-  stopBgm()
+  stopBgmContext(false)
 
   currentBgmName = name
   currentBgm = uni.createInnerAudioContext()
-  currentBgm.src = src
+  applyAudioContextDefaults(currentBgm)
   currentBgm.loop = true
-  currentBgm.autoplay = false
+  currentBgm.src = src
   currentBgm.volume = calculateVolume('bgm')
   currentBgm.onError((error) => {
     console.warn(`播放背景音乐失败: ${name}`, error)
@@ -133,17 +184,7 @@ export function playBgm(name) {
 }
 
 export function stopBgm() {
-  if (!currentBgm) return
-
-  try {
-    currentBgm.stop()
-    currentBgm.destroy()
-  } catch (error) {
-    console.warn('停止背景音乐失败:', error)
-  }
-
-  currentBgm = null
-  currentBgmName = ''
+  stopBgmContext(true)
 }
 
 export function pauseBgm() {
@@ -160,9 +201,9 @@ export function playSfx(name) {
 
   const audio = uni.createInnerAudioContext()
   activeSfxContexts.add(audio)
+  applyAudioContextDefaults(audio)
   audio.src = src
-  audio.autoplay = false
-  audio.volume = calculateVolume('sfx')
+  audio.volume = calculateSfxVolume(name)
 
   const destroyAudio = () => {
     activeSfxContexts.delete(audio)
@@ -173,7 +214,9 @@ export function playSfx(name) {
     }
   }
 
-  audio.onEnded(destroyAudio)
+  audio.onEnded(() => {
+    destroyAudio()
+  })
   audio.onError((error) => {
     console.warn(`播放音效失败: ${name}`, error)
     destroyAudio()
@@ -182,7 +225,7 @@ export function playSfx(name) {
 }
 
 export function stopAllAudio() {
-  stopBgm()
+  stopBgmContext(true)
 
   activeSfxContexts.forEach((audio) => {
     try {

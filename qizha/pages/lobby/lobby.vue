@@ -949,7 +949,7 @@ async function handleJoinRoom(room) {
 .rules-panel {
   position: fixed;
   left: 24px;
-  top: 13%;
+  top: 20%;
   width: 130px;
   height: 60px;
   background: linear-gradient(145deg, rgba(44, 9, 32, 0.95) 0%, rgba(30, 6, 22, 0.98) 100%);

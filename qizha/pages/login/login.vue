@@ -234,15 +234,14 @@ export default {
 
 .interactive-layer {
   position: absolute;
-  top: 17%;
-  left: -25%;
-  width: 80%;
-  height: 60%;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   z-index: 10;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  padding-right: clamp(48px, 9vw, 132px);
+  justify-content: center;
+  padding-top: clamp(96px, 14vh, 150px);
   box-sizing: border-box;
 }
 
@@ -428,7 +427,7 @@ export default {
 
 @media screen and (max-width: 1280px) {
   .interactive-layer {
-    padding-right: 42px;
+    padding-top: 72px;
   }
 
   .login-panel {

@@ -6,7 +6,7 @@
       <view style="width: 100rpx;"></view>
     </view>
 
-    <view v-if="profile" class="profile-content">
+    <view class="profile-content">
       <!-- 上半部分：左右布局 -->
       <view class="top-section">
         <!-- 左侧：头像和基本信息 -->
@@ -81,6 +81,10 @@
           </button>
         </view>
       </view>
+
+      <view v-if="loading" class="loading-mask">
+        <text class="loading-text">加载中...</text>
+      </view>
     </view>
 
     <Toast v-model:visible="toast.show" :message="toast.msg" :type="toast.type" />
@@ -89,31 +93,75 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useAuthStore } from '../../stores/auth'
 import { userAPI } from '../../utils/api'
 import Toast from '../../components/Toast.vue'
 
-const profile = ref(null)
+const authStore = useAuthStore()
+
+const DEFAULT_PROFILE = {
+  id: null,
+  username: '',
+  nickname: '玩家',
+  avatar_url: '',
+  email: '',
+  elo_rating: 1200,
+  total_games: 0,
+  total_wins: 0,
+  total_losses: 0,
+  total_lies: 0,
+  total_challenges: 0,
+  total_successful_challenges: 0
+}
+
+const profile = ref(createProfile())
 const editNickname = ref('')
-const updateMsg = ref('')
+const loading = ref(false)
 const toast = ref({ show: false, msg: '', type: 'error' })
 
 const winRate = computed(() => {
-  if (!profile.value) return 0
-  const total = profile.value.total_games
+  const total = Number(profile.value.total_games) || 0
   if (total === 0) return 0
-  return Math.round((profile.value.total_wins / total) * 100)
+  return Math.round(((Number(profile.value.total_wins) || 0) / total) * 100)
 })
 
-onMounted(async () => {
+onMounted(() => {
+  loadProfile()
+})
+
+function normalizeProfileResponse(res) {
+  if (res?.data && typeof res.data === 'object') return res.data
+  if (res && typeof res === 'object') return res
+  return {}
+}
+
+function createProfile(data = {}) {
+  const storedUser = authStore.user || {}
+  return {
+    ...DEFAULT_PROFILE,
+    ...storedUser,
+    ...data,
+    nickname: data.nickname || storedUser.nickname || DEFAULT_PROFILE.nickname,
+    username: data.username || storedUser.username || DEFAULT_PROFILE.username
+  }
+}
+
+async function loadProfile() {
+  loading.value = true
   try {
     const res = await userAPI.getProfile()
-    profile.value = res.data
-    editNickname.value = res.data?.nickname || ''
+    const nextProfile = createProfile(normalizeProfileResponse(res))
+    profile.value = nextProfile
+    editNickname.value = nextProfile.nickname || ''
   } catch (e) {
     console.error('Failed to load profile:', e)
-    showToast('加载失败')
+    profile.value = createProfile(profile.value)
+    editNickname.value = profile.value.nickname || ''
+    showToast('加载失败，已显示本地资料')
+  } finally {
+    loading.value = false
   }
-})
+}
 
 function showToast(msg, type = 'error') {
   toast.value = { show: true, msg, type }
@@ -121,8 +169,16 @@ function showToast(msg, type = 'error') {
 
 async function updateProfile() {
   try {
-    await userAPI.updateProfile({ nickname: editNickname.value })
-    profile.value.nickname = editNickname.value
+    const res = await userAPI.updateProfile({ nickname: editNickname.value })
+    const nextProfile = createProfile({
+      ...profile.value,
+      ...normalizeProfileResponse(res),
+      nickname: editNickname.value
+    })
+    profile.value = nextProfile
+    authStore.updateUser({
+      nickname: nextProfile.nickname
+    })
     showToast('保存成功', 'success')
   } catch (e) {
     showToast('保存失败')
@@ -172,12 +228,34 @@ function goBack() {
 }
 
 .profile-content {
+  position: relative;
   flex: 1;
   padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 16px;
   overflow: hidden;
+}
+
+.loading-mask {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 6, 4, 0.18);
+  pointer-events: none;
+}
+
+.loading-text {
+  padding: 8px 18px;
+  color: #d4a574;
+  font-size: 14px;
+  font-weight: 700;
+  background: rgba(30, 10, 10, 0.88);
+  border: 1px solid #5c2e2e;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
 }
 
 /* 上半部分：左右布局 */
