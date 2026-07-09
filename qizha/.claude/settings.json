@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git reset *)",
+      "Bash(grep -E \"\\\\.\\(js|ts|md|txt\\)$\")",
+      "Read(//f/shijian3/Liar-s-Bar/**)"
+    ]
+  }
+}
