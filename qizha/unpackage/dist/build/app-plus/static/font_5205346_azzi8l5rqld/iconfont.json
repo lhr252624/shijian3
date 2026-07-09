@@ -1,0 +1,51 @@
+{
+  "id": "5205346",
+  "name": "shijian3",
+  "font_family": "iconfont",
+  "css_prefix_text": "icon-",
+  "description": "",
+  "glyphs": [
+    {
+      "icon_id": "3262648",
+      "name": "放大镜 搜索",
+      "font_class": "fangdajing",
+      "unicode": "e607",
+      "unicode_decimal": 58887
+    },
+    {
+      "icon_id": "6901605",
+      "name": "房间",
+      "font_class": "fangjian",
+      "unicode": "e62e",
+      "unicode_decimal": 58926
+    },
+    {
+      "icon_id": "538884",
+      "name": "退出",
+      "font_class": "tuichu",
+      "unicode": "e622",
+      "unicode_decimal": 58914
+    },
+    {
+      "icon_id": "1167181",
+      "name": "设置",
+      "font_class": "shezhi",
+      "unicode": "e643",
+      "unicode_decimal": 58947
+    },
+    {
+      "icon_id": "12580443",
+      "name": "在线人数",
+      "font_class": "zaixianrenshu",
+      "unicode": "e6bb",
+      "unicode_decimal": 59067
+    },
+    {
+      "icon_id": "27074167",
+      "name": "用户中心-用户",
+      "font_class": "yonghuzhongxin-yonghu",
+      "unicode": "e60e",
+      "unicode_decimal": 58894
+    }
+  ]
+}

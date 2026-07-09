@@ -1,0 +1,171 @@
+.toast-container[data-v-3fc632e9] {
+  position: fixed;
+  top: 1.5625rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  animation: toast-in-3fc632e9 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes toast-in-3fc632e9 {
+from {
+    opacity: 0;
+    transform: translate(-50%, -0.9375rem) scale(0.9);
+}
+to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+}
+}
+.toast-content[data-v-3fc632e9] {
+  display: flex;
+  align-items: center;
+  gap: 0.3125rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.1875rem;
+  font-size: 14px;
+  font-weight: 500;
+  max-width: 80vw;
+  position: relative;
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.5),
+    0 8px 24px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+.toast-container.error .toast-content[data-v-3fc632e9] {
+  background: linear-gradient(135deg,
+    rgba(60, 25, 20, 0.95) 0%,
+    rgba(45, 20, 18, 0.95) 100%);
+  border: 1.5px solid rgba(180, 60, 50, 0.6);
+  color: #f5d4a0;
+}
+.toast-container.success .toast-content[data-v-3fc632e9] {
+  background: linear-gradient(135deg,
+    rgba(35, 55, 30, 0.95) 0%,
+    rgba(25, 40, 22, 0.95) 100%);
+  border: 1.5px solid rgba(100, 150, 80, 0.6);
+  color: #d4e8a0;
+}
+.toast-container.info .toast-content[data-v-3fc632e9] {
+  background: linear-gradient(135deg,
+    rgba(40, 35, 30, 0.95) 0%,
+    rgba(30, 25, 20, 0.95) 100%);
+  border: 1.5px solid rgba(120, 100, 70, 0.6);
+  color: #e8d4a0;
+}
+.toast-icon[data-v-3fc632e9] {
+  font-size: 16px;
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+.toast-msg[data-v-3fc632e9] {
+  flex: 1;
+  line-height: 1.5;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  letter-spacing: 0.3px;
+}
+
+
+.history-page[data-v-b2d018fa] {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+}
+.page-header[data-v-b2d018fa] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  background: rgba(22, 33, 62, 0.8);
+  border-bottom: 1px solid #333;
+}
+.back-btn[data-v-b2d018fa] {
+  background: none;
+  color: #888;
+  padding: 0;
+  font-size: 0.875rem;
+}
+.page-title[data-v-b2d018fa] {
+  color: #e94560;
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+.history-content[data-v-b2d018fa] {
+  height: calc(100vh - 3.75rem);
+  padding: 1.25rem;
+}
+.empty[data-v-b2d018fa] {
+  text-align: center;
+  color: #666;
+  padding: 3.75rem 0;
+  font-size: 0.875rem;
+}
+.history-card[data-v-b2d018fa] {
+  background: rgba(22, 33, 62, 0.8);
+  border: 1px solid #333;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+}
+.history-card.win[data-v-b2d018fa] {
+  border-color: #4ade80;
+  box-shadow: 0 0 0.625rem rgba(74, 222, 128, 0.2);
+}
+.history-card.lose[data-v-b2d018fa] {
+  border-color: #e94560;
+  box-shadow: 0 0 0.625rem rgba(233, 69, 96, 0.2);
+}
+.history-header[data-v-b2d018fa] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+.result-badge[data-v-b2d018fa] {
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  background: rgba(233, 69, 96, 0.2);
+  color: #e94560;
+}
+.result-badge.win[data-v-b2d018fa] {
+  background: rgba(74, 222, 128, 0.2);
+  color: #4ade80;
+}
+.history-date[data-v-b2d018fa] {
+  color: #888;
+  font-size: 0.75rem;
+}
+.history-stats[data-v-b2d018fa] {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 0.625rem;
+}
+.stat-item[data-v-b2d018fa] {
+  flex: 1;
+  text-align: center;
+}
+.stat-label[data-v-b2d018fa] {
+  display: block;
+  color: #888;
+  font-size: 0.6875rem;
+  margin-bottom: 0.25rem;
+}
+.stat-value[data-v-b2d018fa] {
+  display: block;
+  color: #e0e0e0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+.elo-change[data-v-b2d018fa] {
+  text-align: center;
+  padding: 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  background: rgba(233, 69, 96, 0.2);
+  color: #e94560;
+}
+.elo-change.positive[data-v-b2d018fa] {
+  background: rgba(74, 222, 128, 0.2);
+  color: #4ade80;
+}
