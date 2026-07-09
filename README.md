@@ -169,6 +169,10 @@ API 和 WebSocket 地址在以下文件中维护：
 - `utils/api.js`
 - `utils/websocket.js`
 
+服务端代码仓库：
+
+- [even-young-leaf/Liar-s-Bar](https://github.com/even-young-leaf/Liar-s-Bar)
+
 开发或部署到不同环境时，需要确认后端 HTTP 和 WebSocket 地址可访问。
 
 ### 页面配置
