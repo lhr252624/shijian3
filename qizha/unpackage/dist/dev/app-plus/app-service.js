@@ -2717,6 +2717,7 @@ This will fail in production.`);
     setup(__props) {
       let fallbackTimer = null;
       let leaving = false;
+      const videoReady = vue.ref(false);
       function enterLobby(playSkipSound = false) {
         if (leaving)
           return;
@@ -2732,7 +2733,7 @@ This will fail in production.`);
         });
       }
       function handleVideoError(err) {
-        formatAppLog("error", "at pages/cg/cg.vue:47", "CG 视频播放失败:", err);
+        formatAppLog("error", "at pages/cg/cg.vue:49", "CG 视频播放失败:", err);
         enterLobby();
       }
       function setLandscape() {
@@ -2741,6 +2742,13 @@ This will fail in production.`);
       vue.onMounted(() => {
         setLandscape();
         stopBgm();
+        if (typeof plus !== "undefined" && plus.video) {
+          videoReady.value = true;
+        } else {
+          formatAppLog("warn", "at pages/cg/cg.vue:67", "当前 App 包未包含 VideoPlayer 模块，跳过 CG");
+          setTimeout(() => enterLobby(), 300);
+          return;
+        }
         fallbackTimer = setTimeout(() => {
           enterLobby();
         }, 12e4);
@@ -2753,9 +2761,10 @@ This will fail in production.`);
       });
       return (_ctx, _cache) => {
         return vue.openBlock(), vue.createElementBlock("view", { class: "cg-page" }, [
-          vue.createElementVNode(
+          videoReady.value ? (vue.openBlock(), vue.createElementBlock(
             "video",
             {
+              key: 0,
               id: "introCg",
               class: "cg-video",
               src: "/static/videos/cg.mp4",
@@ -2772,7 +2781,7 @@ This will fail in production.`);
             null,
             32
             /* NEED_HYDRATION */
-          ),
+          )) : vue.createCommentVNode("v-if", true),
           vue.createElementVNode("view", { class: "cg-overlay" }, [
             vue.createElementVNode("button", {
               class: "skip-btn",

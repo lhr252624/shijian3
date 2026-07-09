@@ -1,6 +1,7 @@
 <template>
   <view class="cg-page">
     <video
+      v-if="videoReady"
       id="introCg"
       class="cg-video"
       src="/static/videos/cg.mp4"
@@ -22,11 +23,12 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { playSfx, stopBgm } from '../../utils/audio'
 
 let fallbackTimer = null
 let leaving = false
+const videoReady = ref(false)
 
 function enterLobby(playSkipSound = false) {
   if (leaving) return
@@ -57,6 +59,21 @@ function setLandscape() {
 onMounted(() => {
   setLandscape()
   stopBgm()
+
+  // #ifdef APP-PLUS
+  if (typeof plus !== 'undefined' && plus.video) {
+    videoReady.value = true
+  } else {
+    console.warn('当前 App 包未包含 VideoPlayer 模块，跳过 CG')
+    setTimeout(() => enterLobby(), 300)
+    return
+  }
+  // #endif
+
+  // #ifndef APP-PLUS
+  videoReady.value = true
+  // #endif
+
   fallbackTimer = setTimeout(() => {
     enterLobby()
   }, 120000)

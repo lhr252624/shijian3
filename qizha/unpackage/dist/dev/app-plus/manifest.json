@@ -17,6 +17,7 @@
     "url": ""
   },
   "permissions": {
+    "VideoPlayer": {},
     "UniNView": {
       "description": "UniNView原生渲染"
     }
@@ -41,6 +42,7 @@
     "usingComponents": true,
     "nvueCompiler": "uni-app",
     "nvueStyleCompiler": "uni-app",
+    "runmode": "liberate",
     "statusbar": {
       "immersed": "supportedDevice",
       "style": "light",

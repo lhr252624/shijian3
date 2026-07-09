@@ -186,8 +186,11 @@ API 和 WebSocket 地址在以下文件中维护：
 - App 基础信息
 - 横屏和全屏相关配置
 - App 图标
+- VideoPlayer 视频播放模块，用于注册后的开场 CG
 - Android 权限
 - App Plus splashscreen
+
+打正式 APK 时需要使用包含 `VideoPlayer` 模块的云打包或自定义基座；如果正式包缺少该模块，App 端 `<video>` 组件会弹出“打包时未添加 videoplayer 模块”。调试基座通常自带该模块，因此真机调试正常不代表正式包也包含它。
 
 ## 音量设置
 
