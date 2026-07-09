@@ -70,7 +70,8 @@
 
 <script setup>
 import { ref, onMounted, onActivated, nextTick } from 'vue'
-import { matchAPI } from '../../utils/api'
+import { onLoad } from '@dcloudio/uni-app'
+import { matchAPI, roomAPI } from '../../utils/api'
 import { playBgm, playSfx } from '../../utils/audio'
 import Loading from '../../components/Loading.vue'
 
@@ -78,6 +79,8 @@ const selectedCharacter = ref('')
 const loading = ref(false)
 const forceRenderKey = ref(0)
 const enableAnimations = ref(false)
+const pageMode = ref('match')
+const pendingRoomName = ref('')
 
 // 角色数据
 const characters = ref([
@@ -118,6 +121,11 @@ function setLandscape() {
   console.log('已设置横屏模式')
   // #endif
 }
+
+onLoad((options = {}) => {
+  pageMode.value = options.mode || 'match'
+  pendingRoomName.value = decodeURIComponent(options.roomName || '')
+})
 
 onMounted(() => {
   setLandscape()
@@ -188,25 +196,39 @@ async function confirmAndMatch() {
     return
   }
 
-  console.log('========== 开始匹配 ==========')
+  console.log('========== 确认角色 ==========')
   console.log('选中的角色ID:', selectedCharacter.value)
-  console.log('发送的数据:', { character_id: selectedCharacter.value })
+  console.log('页面模式:', pageMode.value)
   console.log('================================')
 
   loading.value = true
   try {
-    // 调用匹配API，传入角色ID
+    if (pageMode.value === 'create-room') {
+      const result = await roomAPI.create(pendingRoomName.value, selectedCharacter.value)
+      const data = result?.data || result || {}
+      const room = data.room || data
+      const roomId = room.id || room.room_id
+
+      if (!roomId) {
+        throw new Error('创建房间成功但未返回房间ID')
+      }
+
+      uni.redirectTo({
+        url: `/pages/game-room/game-room?id=${roomId}&character_id=${encodeURIComponent(selectedCharacter.value)}`
+      })
+      return
+    }
+
     const result = await matchAPI.start({ character_id: selectedCharacter.value })
     console.log('匹配API返回结果:', result)
 
-    // 跳转到匹配等待页面
     uni.redirectTo({
       url: '/pages/match-wait/match-wait'
     })
   } catch (e) {
-    console.error('匹配失败:', e)
+    console.error('确认角色失败:', e)
     uni.showToast({
-      title: '匹配失败，请重试',
+      title: pageMode.value === 'create-room' ? '创建房间失败，请重试' : '匹配失败，请重试',
       icon: 'none'
     })
   } finally {

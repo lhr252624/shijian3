@@ -481,6 +481,7 @@ const authStore = useAuthStore()
 const gameStore = useGameStore()
 
 const roomId = ref('')
+const selectedCharacterId = ref('')
 const pageOptions = ref(null)
 const gameState = ref(null)
 const roomState = ref(null)
@@ -766,8 +767,10 @@ onLoad((options) => {
 
   pageOptions.value = options
   roomId.value = options?.id || ''
+  selectedCharacterId.value = options?.character_id || ''
 
   console.log('房间ID:', roomId.value)
+  console.log('选择角色ID:', selectedCharacterId.value)
 
   if (!roomId.value) {
     console.error('房间ID无效，参数:', options)
@@ -851,7 +854,10 @@ onMounted(async () => {
     // 等待WebSocket连接后，发送加入房间消息
     setTimeout(() => {
       console.log('发送 PLAYER_JOIN 消息，roomId:', roomId.value)
-      wsClient.send('PLAYER_JOIN', { room_id: roomId.value })
+      wsClient.send('PLAYER_JOIN', {
+        room_id: roomId.value,
+        ...(selectedCharacterId.value ? { character_id: selectedCharacterId.value } : {})
+      })
     }, 500)
 
     console.log('注册 WebSocket 事件监听器')
@@ -1309,10 +1315,18 @@ function setReady() {
 
 // 聊天
 function sendChat() {
-  if (!chatText.value.trim()) return
+  const message = chatText.value.trim()
+  if (!message) return
+
   playSfx('chat')
   wsClient.send('CHAT', {
-    content: chatText.value.trim()
+    content: message
+  })
+
+  chatMessages.value.push({
+    sender: '我',
+    text: message,
+    id: `chat${Date.now()}${Math.floor(Math.random() * 10000)}`
   })
   chatText.value = ''
 }
@@ -1645,8 +1659,20 @@ function onGameOver(payload) {
 function onPlayerLeft(payload) {
   console.log('PLAYER_LEFT:', payload)
   playSfx('playerLeave')
+  const leftPlayerId = String(payload.player_id || '')
+  const leftPlayer = gameState.value?.players?.find(p =>
+    String(p.id) === leftPlayerId || String(p.user_id) === leftPlayerId
+  )
+  const payloadMarksDead =
+    payload.is_alive === false ||
+    payload.alive === false ||
+    payload.dead === true ||
+    payload.eliminated === true ||
+    payload.status === 'dead' ||
+    payload.status === 'eliminated'
+  const leftPlayerWasDead = payloadMarksDead || (leftPlayer && leftPlayer.is_alive === false)
 
-  if (payload.game_over) {
+  if (payload.game_over && !leftPlayerWasDead) {
     // 游戏中途有人离开，游戏结束
     leaveReason.value = payload.reason || '玩家退出，游戏结束'
     const name = payload.nickname || `玩家${payload.player_id}`
@@ -1661,7 +1687,7 @@ function onPlayerLeft(payload) {
   } else {
     const name = payload.nickname || `玩家${payload.player_id}`
     // addSystemMsg(`${name} 离开了房间`)
-    addActionLog(`🚪 ${name} 离开了房间`, 'system')
+    addActionLog(leftPlayerWasDead ? `🚪 ${name} 淘汰后离开观战，本局继续` : `🚪 ${name} 离开了房间`, 'system')
   }
 }
 
@@ -1734,34 +1760,7 @@ function updateVolume(key, event) {
 
 // 发送聊天消息（气泡面板使用）
 function sendChatMessage() {
-  if (!chatText.value.trim()) {
-    console.log('消息为空，不发送')
-    return
-  }
-
-  const message = chatText.value.trim()
-  playSfx('chat')
-  console.log('准备发送消息:', message)
-
-  // 通过 WebSocket 发送聊天消息
-  wsClient.send({
-    type: 'CHAT',
-    payload: {
-      content: message
-    }
-  })
-
-  // 添加到本地消息列表
-  chatMessages.value.push({
-    sender: '我',
-    text: message,
-    id: `chat${Date.now()}${Math.floor(Math.random() * 10000)}`
-  })
-
-  // 清空输入框
-  chatText.value = ''
-
-  console.log('消息已发送，当前聊天列表:', chatMessages.value)
+  sendChat()
 }
 </script>
 

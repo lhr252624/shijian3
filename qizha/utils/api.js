@@ -127,11 +127,14 @@ export const matchAPI = {
 
 // 房间相关API
 export const roomAPI = {
-  create: (name) =>
+  create: (name, characterId) =>
     request({
       url: "/rooms",
       method: "POST",
-      data: { name },
+      data: {
+        name,
+        ...(characterId ? { character_id: characterId } : {}),
+      },
     }),
 
   list: () =>

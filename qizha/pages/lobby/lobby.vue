@@ -424,24 +424,16 @@ function showCreateRoomDialog() {
 
 // 处理创建房间
 async function handleCreateRoom(roomName) {
-  loading.value = true
-  try {
-    const result = await roomAPI.create(roomName)
-    const roomId = result.data?.id || result.data?.room_id
-    if (roomId) {
-      showToast('房间创建成功', 'success')
-      // 停止轮询
-      stopRoomPolling()
-      // 跳转到房间页面
-      uni.navigateTo({
-        url: `/pages/game-room/game-room?id=${roomId}`
-      })
-    }
-  } catch (e) {
-    showToast(e.response?.data?.msg || '创建房间失败', 'error')
-  } finally {
-    loading.value = false
+  const name = String(roomName || '').trim()
+  if (!name) {
+    showToast('请输入房间名称', 'error')
+    return
   }
+
+  stopRoomPolling()
+  uni.navigateTo({
+    url: `/pages/character-select/character-select?mode=create-room&roomName=${encodeURIComponent(name)}`
+  })
 }
 
 // 显示房间列表
