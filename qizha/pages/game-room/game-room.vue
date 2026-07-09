@@ -58,7 +58,11 @@
         <view class="waiting-players">
           <view v-for="seat in waitingSeats" :key="seat.index" class="waiting-player"
             :class="{ empty: !seat.player, ready: seat.player?.is_ready }">
-            <view class="waiting-avatar">{{ seat.player ? (seat.player.is_ai ? '🤖' : '👤') : '-' }}</view>
+            <view class="waiting-avatar">
+              <image v-if="getCharacterHeadImage(seat.player?.character_id)" class="character-head"
+                :src="getCharacterHeadImage(seat.player.character_id)" mode="aspectFill" />
+              <text v-else>{{ seat.player ? (seat.player.is_ai ? '🤖' : '👤') : '-' }}</text>
+            </view>
             <text class="waiting-name">{{ seat.player?.nickname || '等待加入' }}</text>
             <text class="waiting-status">
               {{ seat.player ? (seat.player.is_ai ? 'AI' : (seat.player.is_ready ? '已准备' : '未准备')) : '空位' }}
@@ -97,7 +101,9 @@
           <!-- 玩家编号 -->
           <view class="player-number">P{{ opponents[0].seat_index + 1 }}</view>
           <view class="player-avatar">
-            <text v-if="opponents[0].is_ai">🤖</text>
+            <image v-if="getCharacterHeadImage(opponents[0].character_id)" class="character-head"
+              :src="getCharacterHeadImage(opponents[0].character_id)" mode="aspectFill" />
+            <text v-else-if="opponents[0].is_ai">🤖</text>
             <text v-else>👤</text>
           </view>
           <view class="player-name-row">
@@ -127,7 +133,9 @@
           <!-- 玩家编号 -->
           <view class="player-number">P{{ opponents[1].seat_index + 1 }}</view>
           <view class="player-avatar">
-            <text v-if="opponents[1].is_ai">🤖</text>
+            <image v-if="getCharacterHeadImage(opponents[1].character_id)" class="character-head"
+              :src="getCharacterHeadImage(opponents[1].character_id)" mode="aspectFill" />
+            <text v-else-if="opponents[1].is_ai">🤖</text>
             <text v-else>👤</text>
           </view>
           <view class="player-name-row">
@@ -157,7 +165,9 @@
           <!-- 玩家编号 -->
           <view class="player-number">P{{ opponents[2].seat_index + 1 }}</view>
           <view class="player-avatar">
-            <text v-if="opponents[2].is_ai">🤖</text>
+            <image v-if="getCharacterHeadImage(opponents[2].character_id)" class="character-head"
+              :src="getCharacterHeadImage(opponents[2].character_id)" mode="aspectFill" />
+            <text v-else-if="opponents[2].is_ai">🤖</text>
             <text v-else>👤</text>
           </view>
           <view class="player-name-row">
@@ -204,7 +214,11 @@
             <view class="my-info">
               <!-- 玩家编号 -->
               <view v-if="myPlayer" class="player-number my-number">P{{ myPlayer.seat_index + 1 }}</view>
-              <view class="my-avatar">👤</view>
+              <view class="my-avatar">
+                <image v-if="getCharacterHeadImage(myPlayer?.character_id)" class="character-head"
+                  :src="getCharacterHeadImage(myPlayer.character_id)" mode="aspectFill" />
+                <text v-else>👤</text>
+              </view>
               <view class="my-details">
                 <view class="player-name-row">
                   <text class="my-name">{{ authStore.user?.nickname || '我' }}</text>
@@ -350,7 +364,11 @@
         <view class="skill-targets">
           <view v-for="player in opponents" :key="player.id" class="skill-target"
             :class="{ disabled: !player.is_alive }" @tap="useSkillOnTarget(player.id)">
-            <view class="target-avatar">{{ player.is_ai ? '🤖' : '👤' }}</view>
+            <view class="target-avatar">
+              <image v-if="getCharacterHeadImage(player.character_id)" class="character-head"
+                :src="getCharacterHeadImage(player.character_id)" mode="aspectFill" />
+              <text v-else>{{ player.is_ai ? '🤖' : '👤' }}</text>
+            </view>
             <text class="target-name">{{ player.nickname }}</text>
             <text class="target-cards">{{ player.hand_count }} 张牌</text>
           </view>
@@ -391,6 +409,7 @@ import { onLoad } from '@dcloudio/uni-app'
 import { useAuthStore } from '../../stores/auth'
 import { useGameStore } from '../../stores/game'
 import { roomAPI } from '../../utils/api'
+import { playBgm, playSfx } from '../../utils/audio'
 import wsClient from '../../utils/websocket'
 import Toast from '../../components/Toast.vue'
 import RulesModal from '../../components/RulesModal.vue'
@@ -564,9 +583,20 @@ const characterNames = {
   'tor': 'Tor'
 }
 
+const characterHeadImages = {
+  'scubby': '../../static/tavern_characters_v01/assets/art/characters/scubby/scubby_head.png',
+  'foxy': '../../static/tavern_characters_v01/assets/art/characters/foxy/foxy_head.png',
+  'bristle': '../../static/tavern_characters_v01/assets/art/characters/bristle/bristle_head.png',
+  'tor': '../../static/tavern_characters_v01/assets/art/characters/tor/tor_head.png'
+}
+
 // 获取角色名称
 const getCharacterName = (characterId) => {
   return characterNames[characterId] || ''
+}
+
+const getCharacterHeadImage = (characterId) => {
+  return characterHeadImages[characterId] || ''
 }
 
 // 是否显示技能按钮（只要是Foxy就显示）
@@ -683,6 +713,7 @@ onMounted(async () => {
 
   try {
     setLandscape()
+    playBgm('playing')
 
     // 详细检查 authStore 状态
     console.log('authStore.isLoggedIn:', authStore.isLoggedIn)
@@ -788,6 +819,7 @@ onMounted(async () => {
 
 onActivated(() => {
   setLandscape()
+  playBgm('playing')
 })
 
 onUnmounted(() => {
@@ -1049,6 +1081,7 @@ function toggleCard(index) {
   // 只有能出牌时才能选牌
   if (!canPlayCard.value) return
 
+  playSfx('selectCard')
   const idx = selectedCards.value.indexOf(index)
   if (idx > -1) {
     selectedCards.value.splice(idx, 1)
@@ -1069,6 +1102,7 @@ function resetSelection() {
 function playCards() {
   if (selectedCards.value.length === 0) return
 
+  playSfx('playCard')
   const cardIds = selectedCards.value.map(idx => idx)
   wsClient.send('PLAY_CARD', {
     card_ids: cardIds,
@@ -1099,6 +1133,7 @@ function challenge() {
 
   // 标记已质疑
   hasChallenged.value = true
+  playSfx('challenge')
 
   wsClient.send('CHALLENGE', {
     target_player_id: targetId
@@ -1122,6 +1157,7 @@ function passTurn() {
 
   // 标记已放弃
   hasPassedChallenge.value = true
+  playSfx('pass')
 
   wsClient.send('PASS')
 
@@ -1141,6 +1177,7 @@ function showSkillTargetSelect() {
     showToast('技能已使用', 'info')
     return
   }
+  playSfx('uiClick')
   showSkillTargets.value = true
 }
 
@@ -1152,6 +1189,7 @@ function useSkillOnTarget(targetPlayerId) {
   }
 
   // 发送技能使用请求
+  playSfx('skill')
   wsClient.send('USE_SKILL', {
     target_player_id: targetPlayerId
   })
@@ -1164,6 +1202,7 @@ function useSkillOnTarget(targetPlayerId) {
 function onSkillResult(payload) {
   console.log('收到技能结果:', payload)
   if (payload.skill === 'foxy_peek') {
+    playSfx('skill')
     const target = gameState.value?.players?.find(p => p.id === payload.target_player_id)
     const targetName = target?.nickname || '玩家'
     const duration = Math.floor((payload.duration_ms || 3000) / 1000)
@@ -1196,12 +1235,14 @@ function onSkillResult(payload) {
 }
 
 function setReady() {
+  playSfx('ready')
   wsClient.send('PLAYER_READY')
 }
 
 // 聊天
 function sendChat() {
   if (!chatText.value.trim()) return
+  playSfx('chat')
   wsClient.send('CHAT', {
     content: chatText.value.trim()
   })
@@ -1219,6 +1260,7 @@ function addSystemMsg(content) {
 }
 
 function leaveRoom() {
+  playSfx('uiClick')
   confirmDialog.value = {
     visible: true,
     title: '提示',
@@ -1368,6 +1410,7 @@ function onGameState(payload) {
 
 function onGameStarted(payload) {
   console.log('GAME_STARTED:', payload)
+  playSfx('gameStart')
   // 游戏开始时设置初始游戏状态
   if (payload.phase) {
     gameState.value = {
@@ -1406,6 +1449,7 @@ function onChallengeResult(payload) {
   const challengerName = getPlayerName(challengerId)
   const targetName = getPlayerName(targetId)
 
+  playSfx(success ? 'challengeSuccess' : 'challengeFail')
   triggerChallengeFx(success)
 
   // 震动反馈
@@ -1459,6 +1503,7 @@ function onRoulette(payload) {
   const player = gameState.value?.players?.find(p => p.id === playerId)
 
   if (survived) {
+    playSfx('rouletteSurvive')
     // addSystemMsg(`玩家${playerId}扣动扳机${bulletCount}次，幸存！`)
     addActionLog(`🎲 ${playerName} 进入惩罚阶段，扣动扳机 ${bulletCount} 次 → 幸存`, 'punishment')
 
@@ -1467,6 +1512,7 @@ function onRoulette(payload) {
       addGameLog(`🎲 P${player.seat_index + 1} ${player.nickname} 扣动扳机 ${bulletCount} 次 → 幸存`, LogType.PUNISHMENT)
     }
   } else {
+    playSfx('rouletteHit')
     // addSystemMsg(`玩家${playerId}扣动扳机${bulletCount}次，被击中！`)
     addActionLog(`💥 ${playerName} 进入惩罚阶段，扣动扳机 ${bulletCount} 次 → 被击中！`, 'punishment')
 
@@ -1481,6 +1527,7 @@ function onPlayerEliminated(payload) {
   console.log('PLAYER_ELIMINATED:', payload)
   const playerId = payload.player_id
 
+  playSfx('eliminated')
   triggerEliminateFx(playerId)
 
   // #ifdef APP-PLUS
@@ -1509,6 +1556,7 @@ function onPlayerEliminated(payload) {
 
 function onGameOver(payload) {
   console.log('GAME_OVER:', payload)
+  playSfx('gameOver')
   gameState.value = {
     ...(gameState.value || {}),
     phase: 'GAME_OVER',
@@ -1528,6 +1576,7 @@ function onGameOver(payload) {
 
 function onPlayerLeft(payload) {
   console.log('PLAYER_LEFT:', payload)
+  playSfx('playerLeave')
 
   if (payload.game_over) {
     // 游戏中途有人离开，游戏结束
@@ -1550,6 +1599,7 @@ function onPlayerLeft(payload) {
 
 function onPlayerJoined(payload) {
   console.log('PLAYER_JOINED:', payload)
+  playSfx('playerJoin')
   const name = payload.nickname || `玩家${payload.player_id}`
   // addSystemMsg(`${name} 加入了房间`)
   addActionLog(`👋 ${name} 加入了房间`, 'system')
@@ -1557,6 +1607,7 @@ function onPlayerJoined(payload) {
 
 function onChat(payload) {
   console.log('CHAT:', payload)
+  playSfx('chat')
   chatMessages.value.push({
     sender: payload.sender_name || `玩家${payload.sender_id}`,
     content: payload.content,
@@ -1567,6 +1618,7 @@ function onChat(payload) {
 
 // 切换聊天面板
 function toggleChatPanel() {
+  playSfx('uiClick')
   console.log('点击聊天按钮，当前聊天消息:', chatMessages.value)
   console.log('聊天消息数量:', chatMessages.value.length)
 
@@ -1582,6 +1634,7 @@ function toggleChatPanel() {
 
 // 切换日志面板
 function toggleLogPanel() {
+  playSfx('uiClick')
   console.log('点击日志按钮，当前日志:', gameLogs.value)
   console.log('日志数量:', gameLogs.value.length)
 
@@ -1603,6 +1656,7 @@ function sendChatMessage() {
   }
 
   const message = chatText.value.trim()
+  playSfx('chat')
   console.log('准备发送消息:', message)
 
   // 通过 WebSocket 发送聊天消息
@@ -2236,6 +2290,14 @@ function sendChatMessage() {
   align-items: center;
   justify-content: center;
   font-size: 14px;
+  overflow: hidden;
+}
+
+.character-head {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: block;
 }
 
 .player-name-row {
@@ -2476,8 +2538,8 @@ function sendChatMessage() {
 
 .my-avatar {
   margin-left: 28rpx;
-  /* width: 28rpx; */
-  /* height: 28rpx; */
+  width: 28rpx;
+  height: 28rpx;
   background: rgba(60, 30, 30, 0.6);
   border: 1rpx solid #5a3a1e;
   border-radius: 50%;
@@ -2486,6 +2548,7 @@ function sendChatMessage() {
   justify-content: center;
   font-size: 16px;
   flex-shrink: 0;
+  overflow: hidden;
 }
 
 .my-details {
@@ -2801,8 +2864,15 @@ function sendChatMessage() {
 }
 
 .waiting-avatar {
+  width: 48px;
+  height: 48px;
   font-size: 32px;
   margin-bottom: 8px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .waiting-name {
@@ -2972,7 +3042,13 @@ function sendChatMessage() {
 .target-avatar {
   font-size: 24px;
   width: 40px;
+  height: 40px;
   text-align: center;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .target-name {

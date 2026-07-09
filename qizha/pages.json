@@ -1,6 +1,14 @@
 {
 	"pages": [
 		{
+			"path": "pages/studio-splash/studio-splash",
+			"style": {
+				"navigationBarTitleText": "启动",
+				"navigationStyle": "custom",
+				"pageOrientation": "landscape"
+			}
+		},
+		{
 			"path": "pages/login/login",
 			"style": {
 				"navigationBarTitleText": "登录",
@@ -12,6 +20,14 @@
 			"path": "pages/register/register",
 			"style": {
 				"navigationBarTitleText": "注册",
+				"navigationStyle": "custom",
+				"pageOrientation": "landscape"
+			}
+		},
+		{
+			"path": "pages/cg/cg",
+			"style": {
+				"navigationBarTitleText": "开场动画",
 				"navigationStyle": "custom",
 				"pageOrientation": "landscape"
 			}

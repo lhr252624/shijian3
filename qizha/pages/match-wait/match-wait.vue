@@ -13,6 +13,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, onActivated } from 'vue'
 import { matchAPI } from '../../utils/api'
+import { playBgm, playSfx } from '../../utils/audio'
 import wsClient from '../../utils/websocket'
 
 const elapsed = ref(0)
@@ -28,6 +29,7 @@ function setLandscape() {
 
 function onMatchFound(payload) {
   console.log('收到 MATCH_FOUND:', payload)
+  playSfx('matchSuccess')
   if (timer) clearInterval(timer)
   const roomId = payload.room_id
   if (roomId) {
@@ -45,6 +47,7 @@ function onGameStarted(payload) {
 
 onMounted(() => {
   setLandscape()
+  playBgm('lobby')
 
   timer = setInterval(() => {
     elapsed.value++
@@ -59,6 +62,7 @@ onMounted(() => {
 
 onActivated(() => {
   setLandscape()
+  playBgm('lobby')
 })
 
 onUnmounted(() => {
@@ -68,6 +72,7 @@ onUnmounted(() => {
 })
 
 async function cancelMatch() {
+  playSfx('uiClick')
   try {
     await matchAPI.cancel()
     if (timer) clearInterval(timer)

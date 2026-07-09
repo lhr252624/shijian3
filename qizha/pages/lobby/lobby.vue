@@ -103,7 +103,7 @@
             <view v-for="room in rooms" :key="room.id" class="room-item" :class="{ disabled: !canJoinRoom(room) }"
               @click="handleJoinRoom(room)">
               <view class="room-item-header">
-                <text class="room-name">{{ room.room_name || `房间 ${room.id}` }}</text>
+                <text class="room-name">{{ getRoomName(room) }}</text>
                 <view class="room-status-badge" :class="getRoomStatusClass(room)">
                   {{ getRoomStatusText(room) }}
                 </view>
@@ -112,12 +112,12 @@
               <view class="room-item-body">
                 <view class="room-info-row">
                   <text class="room-info-label">👥 玩家</text>
-                  <text class="room-info-value">{{ room.current_players }}/{{ room.max_players }}</text>
+                  <text class="room-info-value">{{ getRoomPlayerCount(room) }}/{{ getRoomMaxPlayers(room) }}</text>
                 </view>
 
                 <view class="room-info-row">
                   <text class="room-info-label">👤 房主</text>
-                  <text class="room-info-value">ID {{ room.creator_id }}</text>
+                  <text class="room-info-value">{{ getRoomOwnerText(room) }}</text>
                 </view>
               </view>
 
@@ -135,6 +135,28 @@
             <text class="create-btn-icon">+</text>
             <text class="create-btn-text">创建新房间</text>
           </button>
+        </view>
+      </view>
+    </view>
+
+    <!-- 设置模态框 -->
+    <view v-if="showSettings" class="settings-overlay" @click.self="closeSettings">
+      <view class="settings-modal">
+        <view class="settings-header">
+          <text class="settings-title">音量设置</text>
+          <view class="settings-close" @click="closeSettings">×</view>
+        </view>
+
+        <view class="settings-content">
+          <view v-for="item in volumeItems" :key="item.key" class="volume-row">
+            <view class="volume-info">
+              <text class="volume-label">{{ item.label }}</text>
+              <text class="volume-value">{{ audioSettings[item.key] }}%</text>
+            </view>
+            <slider class="volume-slider" :value="audioSettings[item.key]" min="0" max="100" block-size="20"
+              activeColor="#d4a574" backgroundColor="#3a2616" @changing="updateVolume(item.key, $event)"
+              @change="updateVolume(item.key, $event)" />
+          </view>
         </view>
       </view>
     </view>
@@ -203,6 +225,7 @@ import { ref, onMounted, onUnmounted, onActivated } from 'vue'
 import { onShow, onHide } from '@dcloudio/uni-app'
 import { useAuthStore } from '../../stores/auth'
 import { lobbyAPI, roomAPI, matchAPI } from '../../utils/api'
+import { getAudioSettings, playBgm, playSfx, setAudioSetting } from '../../utils/audio'
 import wsClient from '../../utils/websocket'
 import Toast from '../../components/Toast.vue'
 import Loading from '../../components/Loading.vue'
@@ -216,8 +239,15 @@ const lobbyData = ref({ online_count: 0, active_rooms: [] })
 const rooms = ref([])
 const showRules = ref(false)
 const showRoomList = ref(false)
+const showSettings = ref(false)
 const loading = ref(false)
 const toast = ref({ show: false, msg: '', type: 'error' })
+const audioSettings = ref(getAudioSettings())
+const volumeItems = [
+  { key: 'master', label: '主音量' },
+  { key: 'bgm', label: '背景音乐' },
+  { key: 'sfx', label: '音效' }
+]
 
 const createRoomDialog = ref({
   show: false,
@@ -244,6 +274,7 @@ function setLandscape() {
 onMounted(() => {
   console.log('=== 大厅页面加载 ===')
   setLandscape()
+  playBgm('lobby')
 
   // 检查登录状态
   if (!authStore.isLoggedIn) {
@@ -264,11 +295,13 @@ onMounted(() => {
 onActivated(() => {
   console.log('=== 大厅页面显示 ===')
   setLandscape()
+  playBgm('lobby')
 })
 
 // 页面显示时仅获取一次数据
 onShow(() => {
   console.log('=== 大厅页面 onShow ===')
+  playBgm('lobby')
   fetchLobby()
   // 如果房间列表正在显示，也刷新房间列表
   if (showRoomList.value) {
@@ -299,7 +332,7 @@ async function fetchLobby() {
 async function fetchRooms() {
   try {
     const res = await roomAPI.list()
-    rooms.value = res.data || []
+    rooms.value = res.data?.rooms || res.data?.active_rooms || res.data || []
     console.log('房间列表:', rooms.value)
   } catch (e) {
     console.error('获取房间列表失败:', e)
@@ -313,6 +346,7 @@ function showToast(msg, type = 'error') {
 }
 
 async function startMatch() {
+  playSfx('uiClick')
   // 快速匹配 - 不选择角色,直接匹配
   loading.value = true
   try {
@@ -330,6 +364,7 @@ async function startMatch() {
 
 // 新增: 开始游戏 - 选择角色后匹配
 function startGameWithCharacter() {
+  playSfx('uiClick')
   // 跳转到角色选择页面
   uni.navigateTo({
     url: '/pages/character-select/character-select'
@@ -338,6 +373,7 @@ function startGameWithCharacter() {
 
 // 显示创建房间对话框
 function showCreateRoomDialog() {
+  playSfx('uiClick')
   createRoomDialog.value.show = true
 }
 
@@ -365,6 +401,7 @@ async function handleCreateRoom(roomName) {
 
 // 显示房间列表
 function showRoomListView() {
+  playSfx('uiClick')
   showRoomList.value = true
   fetchRooms()
   startRoomPolling()
@@ -372,6 +409,7 @@ function showRoomListView() {
 
 // 关闭房间列表
 function closeRoomList() {
+  playSfx('uiClick')
   showRoomList.value = false
   stopRoomPolling()
 }
@@ -396,17 +434,22 @@ function stopRoomPolling() {
 
 // 判断是否可以加入房间
 function canJoinRoom(room) {
-  return room.status === 'WAITING' && room.current_players < room.max_players
+  if (typeof room.can_join === 'boolean') {
+    return room.can_join
+  }
+  return getRoomPhase(room) === 'WAITING' && getRoomPlayerCount(room) < getRoomMaxPlayers(room)
 }
 
 // 获取房间状态样式类
 function getRoomStatusClass(room) {
-  switch (room.status) {
+  switch (getRoomPhase(room)) {
     case 'WAITING':
       return 'status-waiting'
     case 'PLAYING':
+    case 'CHALLENGE':
       return 'status-playing'
     case 'FINISHED':
+    case 'GAME_OVER':
       return 'status-finished'
     default:
       return ''
@@ -415,12 +458,15 @@ function getRoomStatusClass(room) {
 
 // 获取房间状态文本
 function getRoomStatusText(room) {
-  switch (room.status) {
+  switch (getRoomPhase(room)) {
     case 'WAITING':
       return '等待中'
     case 'PLAYING':
       return '游戏中'
+    case 'CHALLENGE':
+      return '质疑中'
     case 'FINISHED':
+    case 'GAME_OVER':
       return '已结束'
     default:
       return '未知'
@@ -429,32 +475,71 @@ function getRoomStatusText(room) {
 
 // 获取无法加入的原因
 function getJoinDisabledReason(room) {
-  if (room.status === 'PLAYING') {
+  const phase = getRoomPhase(room)
+  if (phase === 'PLAYING' || phase === 'CHALLENGE') {
     return '游戏进行中'
   }
-  if (room.status === 'FINISHED') {
+  if (phase === 'FINISHED' || phase === 'GAME_OVER') {
     return '游戏已结束'
   }
-  if (room.current_players >= room.max_players) {
+  if (getRoomPlayerCount(room) >= getRoomMaxPlayers(room)) {
     return '房间已满'
   }
   return '无法加入'
 }
 
+function getRoomName(room) {
+  return room.room_name || room.name || `房间 ${room.id || room.room_id}`
+}
+
+function getRoomPhase(room) {
+  return room.status || room.phase || 'WAITING'
+}
+
+function getRoomPlayerCount(room) {
+  if (typeof room.current_players === 'number') return room.current_players
+  if (typeof room.players === 'number') return room.players
+  if (Array.isArray(room.players)) return room.players.length
+  if (typeof room.player_count === 'number') return room.player_count
+  return 0
+}
+
+function getRoomMaxPlayers(room) {
+  return room.max_players || 4
+}
+
+function getRoomOwnerText(room) {
+  if (room.creator_id) return `ID ${room.creator_id}`
+  if (room.owner_id) return `ID ${room.owner_id}`
+  if (room.human_count !== undefined) return `${room.human_count} 人`
+  return '-'
+}
+
 function goProfile() {
+  playSfx('uiClick')
   uni.navigateTo({
     url: '/pages/profile/profile'
   })
 }
 
 function goSettings() {
-  uni.showToast({
-    title: '设置功能开发中',
-    icon: 'none'
-  })
+  playSfx('uiClick')
+  audioSettings.value = getAudioSettings()
+  showSettings.value = true
+}
+
+function closeSettings() {
+  playSfx('uiClick')
+  showSettings.value = false
+}
+
+function updateVolume(key, event) {
+  const value = event.detail?.value ?? event.target?.value ?? 0
+  audioSettings.value = setAudioSetting(key, value)
 }
 
 function handleLogout() {
+  playSfx('uiClick')
   logoutDialog.value.show = true
 }
 
@@ -484,17 +569,19 @@ function roomCanJoin(room) {
 }
 
 async function handleJoinRoom(room) {
+  playSfx('uiClick')
   if (!canJoinRoom(room)) return
 
   loading.value = true
   try {
-    await roomAPI.join(room.id)
+    const roomId = room.id || room.room_id
+    await roomAPI.join(roomId)
     showToast('加入房间成功', 'success')
     // 停止轮询
     stopRoomPolling()
     // 跳转到房间页面
     uni.navigateTo({
-      url: `/pages/game-room/game-room?id=${room.id}`
+      url: `/pages/game-room/game-room?id=${roomId}`
     })
   } catch (e) {
     showToast(e.response?.data?.msg || '加入房间失败', 'error')
@@ -517,6 +604,93 @@ async function handleJoinRoom(room) {
   font-style: normal;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.settings-modal {
+  width: 420px;
+  max-width: 86vw;
+  background: linear-gradient(160deg, #1f1610 0%, #2a1c12 100%);
+  border: 3px solid #5a3a1e;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.88), inset 0 1px 0 rgba(212, 165, 116, 0.12);
+  overflow: hidden;
+}
+
+.settings-header {
+  height: 54px;
+  padding: 0 18px 0 22px;
+  border-bottom: 2px solid #3a2616;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-title {
+  color: #d4a574;
+  font-size: 20px;
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.settings-close {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8a6a4a;
+  font-size: 32px;
+  line-height: 1;
+}
+
+.settings-close:active {
+  color: #d4a574;
+  transform: scale(0.95);
+}
+
+.settings-content {
+  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.volume-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.volume-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.volume-label {
+  color: #c9a875;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.volume-value {
+  color: #d94f3d;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.volume-slider {
+  margin: 0;
 }
 
 .lobby {
@@ -607,9 +781,9 @@ async function handleJoinRoom(room) {
 .rules-panel {
   position: fixed;
   left: 24px;
-  top: 33%;
-  width: 120px;
-  height: 160px;
+  top: 13%;
+  width: 130px;
+  height: 60px;
   background: linear-gradient(145deg, rgba(44, 9, 32, 0.95) 0%, rgba(30, 6, 22, 0.98) 100%);
   border: 3px solid transparent;
   border-radius: 12px;

@@ -1,5 +1,6 @@
 <template>
   <view class="register-container">
+  <image class="background-image" src="/static/images/register.png" mode="aspectFill"></image>
     <!-- 交互层 -->
     <view class="interactive-layer">
       <view class="content-wrapper">
@@ -56,6 +57,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, onActivated } from 'vue'
 import { useAuthStore } from '../../stores/auth'
+import { playBgm, playSfx } from '../../utils/audio'
 import Toast from '../../components/Toast.vue'
 
 const authStore = useAuthStore()
@@ -72,12 +74,14 @@ function setLandscape() {
 onMounted(() => {
   console.log('=== 注册页面加载 ===')
   setLandscape()
+  playBgm('login')
 })
 
 // 页面显示时也设置横屏（防止其他页面解锁后无法恢复）
 onActivated(() => {
   console.log('=== 注册页面显示 ===')
   setLandscape()
+  playBgm('login')
 })
 
 const username = ref('')
@@ -92,6 +96,7 @@ function showToast(msg, type = 'error') {
 }
 
 async function handleRegister() {
+  playSfx('uiClick')
   // 防止重复请求
   if (loading.value) {
     console.warn('正在注册中，请勿重复点击')
@@ -144,14 +149,18 @@ async function handleRegister() {
     // 隐藏加载提示
     uni.hideLoading()
 
-    showToast('注册成功，请登录', 'success')
-    console.log('注册成功，1.5秒后跳转到登录页')
+    console.log('注册成功，准备自动登录')
+    await authStore.login(username.value, password.value)
 
-    // 延迟跳转到登录页
+    showToast('注册成功', 'success')
+    console.log('注册成功，1秒后播放开场动画')
+
     setTimeout(() => {
-      console.log('跳转到登录页')
-      uni.navigateBack()
-    }, 1500)
+      console.log('跳转到开场动画')
+      uni.reLaunch({
+        url: '/pages/cg/cg'
+      })
+    }, 1000)
   } catch (e) {
     console.error('注册失败:', e)
     console.error('错误详情:', {
@@ -173,6 +182,7 @@ async function handleRegister() {
 }
 
 function goLogin() {
+  playSfx('uiClick')
   uni.navigateBack()
 }
 </script>
@@ -191,7 +201,13 @@ function goLogin() {
   padding-bottom: constant(safe-area-inset-bottom);
   padding-bottom: env(safe-area-inset-bottom);
 }
-
+.background-image {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
 .interactive-layer {
   position: absolute;
   top: 0;

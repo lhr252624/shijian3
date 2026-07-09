@@ -71,6 +71,7 @@
 <script setup>
 import { ref, onMounted, onActivated, nextTick } from 'vue'
 import { matchAPI } from '../../utils/api'
+import { playBgm, playSfx } from '../../utils/audio'
 import Loading from '../../components/Loading.vue'
 
 const selectedCharacter = ref('')
@@ -120,6 +121,7 @@ function setLandscape() {
 
 onMounted(() => {
   setLandscape()
+  playBgm('lobby')
   // 多次延迟强制重绘，确保渲染稳定
   nextTick(() => {
     setTimeout(() => {
@@ -147,6 +149,7 @@ onMounted(() => {
 
 onActivated(() => {
   setLandscape()
+  playBgm('lobby')
   // 页面激活时也强制重绘
   nextTick(() => {
     setTimeout(() => {
@@ -162,6 +165,7 @@ onActivated(() => {
 })
 
 function selectCharacter(charId) {
+  playSfx('uiClick')
   selectedCharacter.value = charId
   console.log('选择角色:', charId)
 }
@@ -175,6 +179,7 @@ function handleImageLoad(e) {
 }
 
 async function confirmAndMatch() {
+  playSfx('uiClick')
   if (!selectedCharacter.value) {
     uni.showToast({
       title: '请先选择角色',
@@ -210,6 +215,7 @@ async function confirmAndMatch() {
 }
 
 function goBack() {
+  playSfx('uiClick')
   uni.navigateBack()
 }
 </script>
