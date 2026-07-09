@@ -1,12 +1,17 @@
 <script setup>
 import { onLaunch, onShow, onHide } from '@dcloudio/uni-app'
+import { stopAllAudio } from './utils/audio'
 
-onLaunch(() => {
-  console.log('App Launch')
-
+function lockLandscape() {
   // #ifdef APP-PLUS
   // 锁定为横屏模式
   plus.screen.lockOrientation('landscape-primary')
+  // #endif
+}
+
+function applyAppFullscreen() {
+  // #ifdef APP-PLUS
+  lockLandscape()
 
   // 隐藏状态栏和导航栏，实现真正的全屏
   plus.navigator.setFullscreen(true)
@@ -16,6 +21,18 @@ onLaunch(() => {
 
   // 设置沉浸式模式
   plus.navigator.setStatusBarStyle('dark')
+  // #endif
+}
+
+onLaunch(() => {
+  console.log('App Launch')
+
+  // #ifdef APP-PLUS
+  if (typeof plus !== 'undefined') {
+    applyAppFullscreen()
+  } else if (typeof document !== 'undefined') {
+    document.addEventListener('plusready', applyAppFullscreen, false)
+  }
   // #endif
 
   // #ifdef H5
@@ -27,10 +44,12 @@ onLaunch(() => {
 
 onShow(() => {
   console.log('App Show')
+  lockLandscape()
 })
 
 onHide(() => {
   console.log('App Hide')
+  stopAllAudio()
 })
 </script>
 

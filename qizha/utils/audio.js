@@ -35,6 +35,7 @@ const SFX_TRACKS = {
 
 let currentBgm = null
 let currentBgmName = ''
+const activeSfxContexts = new Set()
 
 function clampVolume(value) {
   const numeric = Number(value)
@@ -158,11 +159,13 @@ export function playSfx(name) {
   if (!src) return
 
   const audio = uni.createInnerAudioContext()
+  activeSfxContexts.add(audio)
   audio.src = src
   audio.autoplay = false
   audio.volume = calculateVolume('sfx')
 
   const destroyAudio = () => {
+    activeSfxContexts.delete(audio)
     try {
       audio.destroy()
     } catch (error) {
@@ -176,6 +179,20 @@ export function playSfx(name) {
     destroyAudio()
   })
   audio.play()
+}
+
+export function stopAllAudio() {
+  stopBgm()
+
+  activeSfxContexts.forEach((audio) => {
+    try {
+      audio.stop()
+      audio.destroy()
+    } catch (error) {
+      console.warn('停止音效失败:', error)
+    }
+  })
+  activeSfxContexts.clear()
 }
 
 export function getSoundInventory() {

@@ -236,8 +236,8 @@ export default {
   position: absolute;
   top: 17%;
   left: -25%;
-  width: 100%;
-  height: 100%;
+  width: 80%;
+  height: 60%;
   z-index: 10;
   display: flex;
   align-items: center;
@@ -247,8 +247,8 @@ export default {
 }
 
 .login-panel {
-  width: 376px;
-  padding: 24px 30px 24px;
+  width: 324px;
+  padding: 19px 24px 18px;
   box-sizing: border-box;
   background: linear-gradient(155deg, rgba(23, 13, 9, 0.88) 0%, rgba(42, 24, 17, 0.78) 100%);
   border: 1px solid rgba(212, 165, 116, 0.34);
@@ -264,19 +264,19 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: 17px;
 }
 
 .panel-title {
   color: #f1d5a8;
-  font-size: 30px;
+  font-size: 25px;
   font-weight: 800;
   line-height: 1.15;
   text-shadow: 0 3px 8px rgba(0, 0, 0, 0.8);
 }
 
 .panel-subtitle {
-  margin-top: 5px;
+  margin-top: 4px;
   color: rgba(205, 157, 102, 0.8);
   font-size: 12px;
   font-weight: 700;
@@ -285,16 +285,16 @@ export default {
 
 .input-field {
   width: 100%;
-  height: 48px;
+  height: 40px;
   box-sizing: border-box;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
   background: rgba(8, 5, 4, 0.72);
   border: 1px solid rgba(164, 107, 68, 0.42);
   border-radius: 6px;
   outline: none;
   color: rgba(244, 226, 198, 0.95);
-  font-size: 15px;
-  padding: 0 15px;
+  font-size: 14px;
+  padding: 0 13px;
   caret-color: #d4a574;
   transition: all 0.3s ease;
   box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.55);
@@ -316,19 +316,19 @@ export default {
 }
 
 .input-password {
-  margin-bottom: 20px;
+  margin-bottom: 14px;
 }
 
 .login-button {
   width: 100%;
-  height: 52px;
+  height: 42px;
   background: linear-gradient(180deg, rgba(158, 74, 54, 0.96) 0%, rgba(105, 38, 31, 0.98) 100%);
   border: 1px solid rgba(228, 157, 98, 0.5);
   border-radius: 6px;
   cursor: pointer;
   text-align: center;
-  line-height: 52px;
-  font-size: 18px;
+  line-height: 42px;
+  font-size: 16px;
   font-weight: 700;
   color: rgba(255, 238, 210, 0.97);
   letter-spacing: 3px;
@@ -350,7 +350,7 @@ export default {
 
 .footer-links {
   width: 100%;
-  margin-top: 18px;
+  margin-top: 12px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -410,19 +410,19 @@ export default {
 // 适配不同屏幕尺寸
 @media screen and (min-width: 1920px) {
   .login-panel {
-    width: 430px;
-    padding: 34px 36px 28px;
+    width: 360px;
+    padding: 24px 28px 22px;
   }
 
   .panel-title {
-    font-size: 34px;
+    font-size: 28px;
   }
 
   .input-field,
   .login-button {
-    height: 56px;
-    line-height: 56px;
-    font-size: 17px;
+    height: 46px;
+    line-height: 46px;
+    font-size: 15px;
   }
 }
 

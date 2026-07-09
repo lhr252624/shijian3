@@ -36,7 +36,8 @@
 			"path": "pages/lobby/lobby",
 			"style": {
 				"navigationBarTitleText": "大厅",
-				"navigationStyle": "custom"
+				"navigationStyle": "custom",
+				"pageOrientation": "landscape"
 			}
 		},
 		{
@@ -51,7 +52,8 @@
 			"path": "pages/match-wait/match-wait",
 			"style": {
 				"navigationBarTitleText": "匹配中",
-				"navigationStyle": "custom"
+				"navigationStyle": "custom",
+				"pageOrientation": "landscape"
 			}
 		},
 		{
@@ -66,14 +68,16 @@
 			"path": "pages/profile/profile",
 			"style": {
 				"navigationBarTitleText": "个人中心",
-				"navigationStyle": "custom"
+				"navigationStyle": "custom",
+				"pageOrientation": "landscape"
 			}
 		},
 		{
 			"path": "pages/history/history",
 			"style": {
 				"navigationBarTitleText": "历史战绩",
-				"navigationStyle": "custom"
+				"navigationStyle": "custom",
+				"pageOrientation": "landscape"
 			}
 		}
 	],
